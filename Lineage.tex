@@ -95,7 +95,19 @@
 Modern computing systems are often capable of collecting fine grained lineage to help
 users understand the results, and possibly find data anomalies. 
 We present the Snapshot lineage system as part of the KeystoneML machine learning pipeline. 
-
+Snapshot collects lineage at the transformer level by recording the computation itself, the mapping
+between input and output elements, and optionally the input/output dataset along with a placeholder
+for random factors. 
+Snapshot stores the lineage data on the underneath file system, and builds index over the lineage data
+according to the lineage type. 
+Among the four lineage types, the region lineage is often problematic, as storing and querying it with
+native solution incurs unacceptable memory consumption, disk storage. 
+We introduce a higher order function solution to describe region lineage, and investigate a number of indexing
+algorithms to expedite queries. 
+Experiments show that our higher order function solution reduce the storage overhead for region lineage 
+by an oder of magnitude, and the indexing algorithms can speedup the random and batch query by 168x and 45x,
+respectively.
+We also present two use case studies of Snapshot for image classification and astronomy object detection.
 \end{abstract}
 
 % A category with the (minimum) three required fields
@@ -119,12 +131,8 @@ Hadoop~\cite{HADOOP}
 
 %ACKNOWLEDGMENTS are optional
 \section{Acknowledgments}
-
 This research is supported in part by NSF CISE Expeditions Award CCF-1139158, LBNL Award 7076018, and DARPA XData Award FA8750-12-2-0331, and gifts from Amazon Web Services, Google, SAP,  The Thomas and Stacey Siebel Foundation, Adatao, Adobe, Apple, Inc., Blue Goji, Bosch, C3Energy, Cisco, Cray, Cloudera, EMC, Ericsson, Facebook, Guavus, Huawei, Intel, Microsoft, NetApp, Pivotal, Samsung, Splunk, Virdata, VMware, and Yahoo!. Author FAN is supported by a National Science Foundation Graduate Research Fellowship.
 
-This research is also supported in part by the Gordon and Betty Moore
-Foundation and the Alfred P. Sloan Foundation together through the
-Moore-Sloan Data Science Environment program.
 %
 % The following two commands are all you need in the
 % initial runs of your .tex file to
