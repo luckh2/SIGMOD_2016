@@ -117,8 +117,23 @@ We also present two use case studies of Gineala for image classification and ast
 %\keywords{ACM proceedings, \LaTeX, text tagging}
 
 \section{Introduction}
-Hadoop~\cite{HADOOP} 
- 
+Recording fine grained lineage information for modern distributed computing frameworks can help
+users and practitioners understand the data analysis results, find data anomalies from massive
+datasets, and replay the computation with cleaned data. A lineage system needs to be able to collect the fine grained lineage, 
+provide forward and backward query along the computation stages, and replay partial computation
+that are of users' interest.
+
+Building such a lineage system is particularly challenging because: 
+1) lineage collection can slowdown the analysis dramatically;
+2) lineage data can be hard to capture due to intermediate data's lack of structure
+3) lineage data size can be large to store on disk; 
+4) interaction between users and the lineage system needs to be responsive.
+Specifically for the distributed machine learning system, KeystoneML, the slowdown challenge exacerbates as
+KeystoneML uses Apache Spark as its computing engine. One of Spark's features is to run applications in memory
+without writing/reading intermediate data to/from disks. Comparing to distributed computing engines such as Hadoop~\cite{HADOOP},
+any additional lineage data stored to disk with KeysonteML will slow down the execution more significantly.
+
+
 \section{Background}
 \label{sec:Background}
 Background
