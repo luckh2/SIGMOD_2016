@@ -119,20 +119,63 @@ We also present two use case studies of Gineala for image classification and ast
 \section{Introduction}
 Recording fine grained lineage information for modern distributed computing frameworks can help
 users and practitioners understand the data analysis results, find data anomalies from massive
-datasets, and replay the computation with cleaned data. A lineage system needs to be able to collect the fine grained lineage, 
+datasets, and replay the computation with cleaned data. 
+Users can look into the lineage for a highly rated movie to understand the nature of the supporting
+group. They can also investigate how an erroneous data item propagates in the analysis and replay
+the computation by removing the polluted data at a stage that incurs the least re-execution cost.
+In general, a lineage system needs to be able to collect the fine grained lineage, 
 provide forward and backward query along the computation stages, and replay partial computation
 that are of users' interest.
 
 Building such a lineage system is particularly challenging because: 
 1) lineage collection can slowdown the analysis dramatically;
-2) lineage data can be hard to capture due to intermediate data's lack of structure
-3) lineage data size can be large to store on disk; 
+2) lineage data can be hard to capture due to intermediate data's lack of structure;
+3) lineage data can exceed the disk storage space; 
 4) interaction between users and the lineage system needs to be responsive.
-Specifically for the distributed machine learning system, KeystoneML, the slowdown challenge exacerbates as
-KeystoneML uses Apache Spark as its computing engine. One of Spark's features is to run applications in memory
-without writing/reading intermediate data to/from disks. Comparing to distributed computing engines such as Hadoop~\cite{HADOOP},
-any additional lineage data stored to disk with KeysonteML will slow down the execution more significantly.
 
+Specifically for a distributed machine learning system, some challenges can exacerbate: 
+The slowdown introduced by recording lineage to disks can be significant as the computing engine 
+may run applications completely in memory without writing/reading intermediate data to/from disks. 
+The dataset processed by a distributed machine learning system is usually larger that runs on a desktop.
+On the other hand, dedicated distributed machine learning systems have the intermediate data between
+stages well structured as vectors, matrices, and images (2D images with channels). 
+This allows us to separate the metadata of the coordination system in each data structure from the actual data. 
+Recording the mapping between metadata and storing them consumes less storage space than that of actual data.
+Building index for the metadata mapping can reduce the query response time while paying the cost of time.
+
+In this paper, we investigate the above tradeoffs in the context of the KeystoneML machine learning pipeline that is built on
+top of Apache Spark~\cite{zaharia12}. In particular, we study 1) various data storage options given a space or a query latency constraint, 
+2) a set of indexing algorithms with different memory consumption, disk space, building overhead, and query latency.
+Based on these studies, we present the Gineala lineage system as a module of KeytoneML. 
+Gineala abstracts lineage as input dataset, output dataset, metadata mapping, computation, and random factor. 
+Gineala lets users declare lineage in five pre-defined categories: {\bf One}, {\bf All}, {\bf Region}, {\bf LinCom} (Lineage Combination), and {\bf Gather}.
+It separates the metadata (coordination system of the data structure) from the actual data, and records the metadata mapping. 
+It incorporates metadata type checking for inter-stage lineage query and builds index for {\bf Region} lineage for responsive query.
+Gineala stores lineage information in HDFS~\cite{shvachko10} as Apache Spark's resilient distributed dataset(RDD). 
+It can load the lineage information into KeystoneML in-memory, modify or remove data item from the input dataset, and replay
+the computation interactively.
+
+The contributions of this paper are: 
+1) the use of higher-order function to describe {\bf Region} lineage;
+2) the indexing algorithm that speeds up the query by 45x-168x;
+3) the open source implementation of the Gineala system.
+
+We use three real machine learning pipelines to show Gineala's functionalities and performance. 
+RandomFFTMNIST is a pipeline for hand-written digit recognition. 
+VOCSIFTFisher is an image classification pipeline.
+SourceExtractor is an astronomical image processing pipeline that detects objects in images produced by astronomy telescopes.
+Our results show that by using the higher-order function for {\bf Region} lineage can reduce the the storage space by xxx. 
+Indexing strategies with RTree and KMeans algorithms can speedup the query response time by a factor of xxx with overhead of xxx, respectively.
+The overall slowdown for the three real pipelines are xxx, with xxx more memory and disk consupmtion.
+
+The rest of the paper is organized as following: 
+\S\ref{sec:Background} introduces the background of KeystoneML and typical uses of fine-grained lineage systems. 
+\S\ref{sec:Req} discusses the functional and performance requirements for fine-grained lineage systems.
+\S\ref{sec:Design} discusses the general design of Gineala.
+\S\ref{sec:Impl} documents the Gineala implementation on KeystoneML with technical details
+We present the performance measurements in \S\ref{sec:Perf}.
+\S\ref{sec:Related} surveys existing lineage systems.
+We conclude and envision future work in \S\ref{sec:Conclusion}.
 
 \section{Background}
 \label{sec:Background}
@@ -181,7 +224,7 @@ Query
 \label{sec:Related}
 Related work
 
-\section{Conclusion}
+\section{Conclusion and Future Work}
 \label{sec:Conclusion}
 Conclusion
 
