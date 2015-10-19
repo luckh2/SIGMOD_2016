@@ -195,8 +195,9 @@ DenseVector, DenseMatrix, and Image. DenseVector is a one dimensional data struc
 two dimensional. Image is a three dimensional data structures that is defined by the height, the width and the number
 of channels of an image.
 
-The coordinate of a given element $e \in I$ is denoted as $Coor(e)$. Given the data structure, the coordinate of an
-element can be a single integer, a pair of integers, or a triple of integers for DenseVector, DenseMatrix, and Image, respectively.
+An element $e \in I$ has two properties: value $e.value$ and coordinates $e.coor$. 
+Given the data structure, the coordinates of an element can be a single integer, a pair of integers, or a triple of integers 
+for DenseVector, DenseMatrix, and Image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
 Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{(i+1)}$ as the output. 
@@ -204,10 +205,10 @@ Especially, we denote the output of the whole pipeline as $O = I_{(n+1)}$
 
 \subsection{Dataset Companion}
 Since transformers operate at the data structure (DenseVector, DenseMatrix, Image) level, we use the notation
-$\overline{I_i(e)}$ as the companion of $I_i(e)$ such that 
-\[ \forall a \in \overline{I_i(e)}, a =
+$\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such that 
+\[ \forall a \in \overline{I_i(e)}, a.value =
   \begin{cases}
-    e       & \quad \text{if } Coor(a) = Coor(e)\\
+    e.value       & \quad \text{if } a.coor = e.coor\\
     NaN  & \quad \text{otherwise}. \\
   \end{cases}
 \]
@@ -218,16 +219,24 @@ $\overline{I_i(e_1, e_2, ..., e_m)} = \overline{I_i(e_1)} + \overline{I_i(e_2)} 
 \subsection{Data Lineage}
 We define the data lineage of a given element as the elements in the input dataset that is used to produce present element.
 The single transformer lineage is
-$S(e \in I_{i+1}) = \{e_1, e_2, ..., e_m | T_i(\overline{I_i(e_1, e_2, ..., e_m)}) = \overline{I_{i+1}(e)}\}$.
+\begin{equation}
+S(e \in I_{i+1}) = \{e_1, ..., e_m | T_i(\overline{I_i(e_1, ..., e_m)}) = \overline{I_{i+1}(e)}\}.
+\end{equation}
 
-Recursively, the lineage of a given element across multiple transformers can be defined as \\
-$L(e) = \cup_{e' \in S(e)} L(e')$.
+Recursively, the lineage of a given element across multiple transformers can be defined as
+\begin{equation}
+L(e) = \cup_{e' \in S(e)} L(e').
+\end{equation}
 
 \subsection{Data Lineage Query}
 The forward query of an element over data lineage of a pipeline $P$ returns $qForward(e) = \{e' | e \in L(e' \in O)\}$. 
 And the backward query of an element over data lineage returns $qBackward(e) = e' \in L(e)$.
+Specifically, the identifier of an element is its coordinates in the according data structure, so the query actually takes
+the coordinates of the input element as key, and query over the data lineage. The query that spans multiple transformers 
+use coordinates as intermediate data. Once the query reaches the final transformer, it associates the actual values
+with the result element coordinates and return them.
 
-Queries of multiple elements can then be expressed as: 
+Queries of multiple elements can then be expressed as the union of the query for each element: 
 \begin{equation}
 \begin{split}
 qForward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qForward(e) \\
