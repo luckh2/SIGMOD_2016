@@ -202,7 +202,7 @@ for DenseVector, DenseMatrix, and Image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
 Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{(i+1)}$ as the output. 
-Especially, we denote the output of the whole pipeline as $O = I_{(n+1)}$
+Especially, we denote the output of the whole pipeline as $O = I_{n+1}$
 
 \subsection{Dataset Companion}
 Since transformers operate at the data structure (DenseVector, DenseMatrix, Image) level, we use the notation
@@ -217,17 +217,34 @@ $\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such t
 Accordingly, given a list of elements $(e_1, e_2, ..., e_m)$, the companion of $I_i$ with respect to $(e_1, e_2, ..., e_m)$ is
 $\overline{I_i(e_1, e_2, ..., e_m)} = \overline{I_i(e_1)} + \overline{I_i(e_2)} + ... +\overline{I_i(e_m)} $.
 
-\subsection{Data Lineage}
+\subsection{Data Lineage and Replay}
+Before defining the lineage, we need to introduce the relationship between the two data structures $A$ and $B$ with the same type.
+We say $A \subseteq B \text{ or } B \supseteq A$, $\text{if }\forall a \in A, \exists b \in B, s.t.\text{ } a \neq NaN \land a.coor = b.coor \land a.value = b.value$.
+By saying $A = B$, we mean $A \subseteq B \land B \subseteq A$.
+
 We define the data lineage of a given element as the elements in the input dataset that is used to produce present element.
 The single transformer lineage is
 \begin{equation}
-S(e \in I_{i+1}) = \{e_1, ..., e_m | T_i(\overline{I_i(e_1, ..., e_m)}) = \overline{I_{i+1}(e)}\}.
+S(e \in I_{i+1}) = \{e_1, ..., e_m | T_i(\overline{I_i(e_1, ..., e_m)}) \supseteq \overline{I_{i+1}(e)}\}.
+\label{equa:SingleLineage}
 \end{equation}
+
 
 Recursively, the lineage of a given element across multiple transformers can be defined as
 \begin{equation}
 L(e) = \cup_{e' \in S(e)} L(e').
 \end{equation}
+
+We define the property of $Replay(e \in I_{i+1}) = \overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})$ in Equation~\ref{equa:SingleLineage}
+as the replay property, which means we can reproduce the output solely with its lineage and the corresponding transformer.
+The constraint of the replay property is that only the element $e$ is guaranteed to be the same as the original transformation 1
+if $\overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})$. In this case, the results of the replayed transformer may
+produce inconsistent results for elements other than $e$ in $I_{i+1}$. 
+In some cases, we see a stronger condition of $\overline{I_{i+1}(e)} = T_i(\overline{I_i(e_1, ..., e_m)})$, which indicates that
+the replayed results are exactly the same as the original results.
+
+The replay property for multiple elements require the lineage for all elements. Formally,
+$Replay(e_1,..,e_m \in I_{i+1}) = \overline{I_{i+1}(e_1,...,e_m)} \subseteq \cup_{e \in (e_1,...,e_m)} Replay(e) $.
 
 \subsection{Data Lineage Query}
 The forward query of an element over data lineage of a pipeline $P$ returns $qForward(e) = \{e' | e \in L(e' \in O)\}$. 
@@ -244,6 +261,11 @@ qForward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qForward(e) \\
 qBackward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qBackward(e).
 \end{split}
 \end{equation}
+
+
+If the data lineage of an element $e, e \in I_{i+1}$ with respect to transformer $T_i$ is a group of elements $(e_1, ..., e_m)$ in $I_i$, 
+then it suffices the following property:
+$ \overline{I_{i+1}(e)} = $
 
 \section{Design}
 \label{sec:Design}
