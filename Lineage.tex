@@ -193,10 +193,11 @@ Use cases
 We define a dataset $I$ as a collection of structured data. In the scope of this work, the supported structures are: 
 DenseVector, DenseMatrix, and Image. DenseVector is a one dimensional data structure and DenseVector is
 two dimensional. Image is a three dimensional data structures that is defined by the height, the width and the number
-of channels of an image.
+of channels of an image. 
 
 An element $e \in I$ has two properties: value $e.value$ and coordinates $e.coor$. 
-Given the data structure, the coordinates of an element can be a single integer, a pair of integers, or a triple of integers 
+Combining the additional dimension in the collection with the data structure, 
+the coordinates of an element is a pair of integers, a triple of integers, or a quadruple of integers
 for DenseVector, DenseMatrix, and Image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
