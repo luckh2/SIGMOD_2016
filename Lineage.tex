@@ -206,16 +206,23 @@ Especially, we denote the output of the whole pipeline as $O = I_{n+1}$
 
 \subsection{Dataset Companion}
 Since transformers operate at the data structure (DenseVector, DenseMatrix, Image) level, we use the notation
-$\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such that 
-\[ \forall a \in \overline{I_i(e)}, a.value =
+$\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such that $\forall a \in \overline{I_i(e)}$,
+\[ a.value =
   \begin{cases}
     e.value       & \quad \text{if } a.coor = e.coor\\
     NaN  & \quad \text{otherwise}. \\
   \end{cases}
 \]
 
-Accordingly, given a list of elements $(e_1, e_2, ..., e_m)$, the companion of $I_i$ with respect to $(e_1, e_2, ..., e_m)$ is
-$\overline{I_i(e_1, e_2, ..., e_m)} = \overline{I_i(e_1)} + \overline{I_i(e_2)} + ... +\overline{I_i(e_m)} $.
+Accordingly, given a list of distinct elements $(e_1, ..., e_m)$, the companion of $I_i$ with respect to $(e_1, ..., e_m)$ is
+described as: $\forall a \in \overline{I_i(e_1, ..., e_m)}$, 
+\[ a.value =
+  \begin{cases}
+    e.value       & \quad \text{if } \exists e \in (e_1,...,e_m), a.coor = e.coor\\
+    NaN  & \quad \text{otherwise}. \\
+  \end{cases}
+\]
+
 
 \subsection{Data Lineage and Replay}
 Before defining the lineage, we need to introduce the relationship between the two data structures $A$ and $B$ with the same type.
