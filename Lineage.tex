@@ -179,13 +179,17 @@ We conclude and envision future work in \S\ref{sec:Conclusion}.
 
 \section{Background}
 \label{sec:Background}
-Background
+In this section, we briefly review the KeystoneML and introduces three use cases of Gineala.
 
 \subsection{KeystoneML}
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--Transformers, which perform deterministic data transformation, and Estimators, which ``learn'' Transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
-Use cases
+\subsubsection{Dense SIFT Features Visualization}
+
+\subsubsection{Astronomy Image and Catalog Validation}
+
+\subsubsection{Code Debugging}
 
 \section{Lineage}
 \label{sec:Lin}
@@ -331,11 +335,7 @@ the lineage for other purposes.
 
 \subsection{Lineage}
 For each transformer, Gineala collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
-Among these five data types, the transformer and the collection of mapping are mandatory. 
-The input dataset is mandatory if the transformer is the very first of the pipeline. 
-Otherwise, the input dataset is optional.
-The output dataset is optional, as it can be reproduced by rerunning the transformer with the input dataset.
-The model is required if the transformer is an output of an estimator.
+The model stores the trained model of an estimator generated transformer.
 The random parameter holds the information that guarantees the determinism of the transformer.
 
 For estimators, we only consider linear model estimators in the current implementation. 
@@ -353,7 +353,7 @@ The left mapping is from an input RDD of matrices to an output RDD of matrices.
 \begin{center}
     \includegraphics[width=85mm]{pictures/narrowmapping}
 \caption {Left: The narrow mapping cases in the context of Resilient Distributed Dataset (RDD), rectangles are RDDS and rounded-corner rectangles are matrices.
-Right: Three element-wise mapping cases.
+Right: Three element-wise mapping cases, mappings are shown with color highlights.
     \label{fig:narrowmapping}
 }
 \end{center}
@@ -371,27 +371,65 @@ So Gineala pre-defines these three element-wise mappings.
 In the next section, we will introduce how Gineala's lineage interface exposes the lineage declaration interface with the mapping information.
 
 \subsection{Region Mapping}
-As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the elements in the mapped region. If the output region has $N$ elements and the input region has $M$ elements, the space complexity of storing such a mapping is $O(N*M).$
+As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the input elements in the corresponding region. If the output region has $N$ elements and the input region has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
+Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
+For SIFT, the input elements form a circle with a geographical center and the scale as its radius.
+Similarly, the SourceExtractor's input elements  form an ellipse. 
+Gineala uses a higher-order function to describe the region. 
+Thus the mapping between two regions is expressed as a tuple of two higher-order functions.
+The space complexity goes down to O(1).
+
+Since many softwares such as SIFT and SEP already return the geographical information with the results.
+Gineala exposes some simple interfaces for two dimensional shapes as special cases.
+Users can pass in the geographical information directly to declare square, circle, and ellipse.
+
+Using the higher order function involves an issue for query. If the mapping is recorded at the element level, query is straight forward.
+Given an output element, a backward query returns corresponding input elements.
+Now both the input elements and output elements are encoded with a higher order function. 
+And the mapping between input function and output function is stored in a list. 
+A query that takes an output element as key thus needs to iterate over all input functions and test if the key is in the function or not.
+If the key is in an input function, it then returns the mapping output function, and expands the function to a group of coordinates.
+The time complexity of query over Region Mapping is then $O(N^2)$, assuming there are $N$ tuples in the list and each input function expands to $N$ elements.
+To speedup the query performance, we implement and compare several indexing strategies, and a detailed discussion is in \S\ref{sec:RegionIndex}.
 
 \subsection{Lineage Type}
-Gineala defines two lineage interfaces at high level: NarrowLineage and GatherLineage. 
-NarrowLineage covers the lineage that has a narrow dependency property and GatherLineage covers the dependency in a gather pattern, where the transformer takes a sequence of RDD of data structures and transform them into a single RDD of data structures. 
+Gineala defines three lineage interfaces at high level: NarrowLineage, GatherLineage, LinComLineage. 
+NarrowLineage covers the lineage that has a narrow dependency and GatherLineage covers the dependency in a gather pattern, where the transformer takes a sequence of RDD of data structures and transform them into a single RDD of data structures. 
+LinComLineage is for the transformer which is the output of fitting training dataset to the linear model estimator.
 
-The NarrowLineage can then be further specified in a naming convention of mapping pattern. E.g., NarrowLineage that has One Mapping is named as OneLineage.
+The NarrowLineage can then be further specified with a specific mapping pattern. E.g., NarrowLineage that has One Mapping is named as OneLineage.
 For OneLineage and AllLineage, the users only need to pass the input dataset, output dataset, and the parameters, since Gineala can figure out the element-wise mapping from the metadata of the internal data structure.
 
-For RegionLineage and SampleLineage, Gineala requires the mapping collection for the declaration. Such a collection should be a RDD. 
-Each RDD element is a list of tuples.
+For RegionLineage and SampleLineage, Gineala requires the mapping collection for the declaration. 
+Such a collection should be a RDD of tuple list. 
 Each tuple is a pair of the input region and the output region.
+
+The GatherLineage is implemented within the GatherTransformer.
+And so is LinComLineage for the linear model estimator. LinComLineage requires the model as input for declaration.
+Both these two lineage types can adapt to DenseVectors, DenseMatrix, and Images. 
+Users do not have to modify these two lineage types. 
 
 \section{Implementations}
 \label{sec:Impl}
+This section discusses implementation details for lineage collection, I/O, and region mapping index.
 
-\subsection{Metadata}
+\subsection{Metadata Separation}
+\zhaonote{show a profile study of metadata size and actual data size, saying why metadata is mandatory, input/output datasets are optional}
 
-\subsection{Index}
+\subsection{Lineage I/O}
+\zhaonote{what data to store}
+Among these five data types, the transformer and the collection of mapping are mandatory. 
+The input dataset is mandatory if the transformer is the very first of the pipeline. 
+Otherwise, the input dataset is optional.
+The output dataset is optional, as it can be reproduced by rerunning the transformer with the input dataset.
+\zhaonote{save to HDFS thorugh RDD abstraction, file path consistent with transformer nametag and the very original input RDD id}
+
+\subsection{Region Mapping Index}
+\label{sec:RegionIndex}
+\zhaonote{Direct, RTree, Kmeans}
 
 \subsection{Replay}
+\zhaonote{replay single transformer and multiple transformers}
 
 \section{Performance Measurements}
 \label{sec:Perf}
