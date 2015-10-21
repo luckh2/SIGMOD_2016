@@ -193,7 +193,10 @@ KeystoneML is an application framework designed for the implementation of robust
 
 \section{Lineage}
 \label{sec:Lin}
+In this section, we formally define the notion of pipeline, dataset, lineage and its associated operations of query and replay.
+
 \subsection{Pipeline and Datasets}
+\label{sec:Lin-Pipe-Data}
 We define a dataset $I$ as a collection of structured data. In the scope of this work, the supported structures are: 
 DenseVector, DenseMatrix, and Image. DenseVector is a one dimensional data structure and DenseVector is
 two dimensional. Image is a three dimensional data structures that is defined by the height, the width and the number
@@ -291,6 +294,7 @@ the lineage can reproduce the identical result and the original result even with
 In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
 
 \subsection{Performance Requirements}
+\label{sec:Req-Perf}
 As Gineala incurs additional computation and I/O to record and save lineage, the overall pipeline performance is expected to slowdown.
 Especially for KeystoneML that is built upon Apache Spark, unlike other distributed computing framework such as Hadoop~\cite{HADOOP} 
 that writes/reads intermediate data to disk, any additional I/O can introduce a more significant slowdown. 
@@ -370,6 +374,8 @@ DenseVector and Images.
 So Gineala pre-defines these three element-wise mappings. 
 In the next section, we will introduce how Gineala's lineage interface exposes the lineage declaration interface with the mapping information.
 
+\zhaonote{saying One Mapping and All Mapping are symmetric.}
+
 \subsection{Region Mapping}
 As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the input elements in the corresponding region. If the output region has $N$ elements and the input region has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
 Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
@@ -415,6 +421,39 @@ This section discusses implementation details for lineage collection, I/O, and r
 
 \subsection{Metadata Separation}
 \zhaonote{show a profile study of metadata size and actual data size, saying why metadata is mandatory, input/output datasets are optional}
+As discussed in \S\ref{sec:Req-Perf}, writing lineage to persistent storage can introduce a more dramatical slowdown for KeystoneML comparing
+to the Hadoop-based systems, since Spark seeks to eliminate unnecessary I/O between memory and persistent storage.
+One effective way to reduce the I/O overhead is reduce the lineage data size.
+
+Gineala reduces the lineage data size by 1) separating the metadata from the datasets, 2) tracking only the metadata mapping, 
+3) taking advantage of the mapping types specified by the user, 4) and writing datasets to persistent storage with a configurable 
+setting in the lineage instrumentation in the transformer.
+
+In \S\ref{sec:Lin-Pipe-Data}, we say an element in a data structure has two properties: the coordinate and the value.
+We refer the coordinate as the metadata of a particular element and the value as the actual data. 
+In a backward query of an element throughout the whole pipeline, the query traverses from the last transformer
+to the very first transformer in a sequential manner. 
+We see that in the last the transformer and other transformers in the middle, the metadata mapping is sufficient to answer
+the query of depending input elements of given output elements. Only in the very first transformer do we need both the metadata
+to find the metadata of the depending input elements and the actual data of these elements.
+So Gineala separates the metadata from actual data and only tracks the metadata mapping.
+
+Another lineage size reduction is contributed by user specified mapping types. 
+For the lineage type of {\em OneLineage} and {\em AllLineage}, it is simple for Gineala to infer the mapping from the
+metadata of the data structure. E.g., the height and width of a matrix. 
+In these case, Gineala only records the data structure metadata instead of individual mapping tuple.
+Similar approaches can be applied for {\em GatherLineage} and {\em LinComLineage}.
+While for {\em SampleLineage} and {\em RegionLineage}, the mapping is between two groups of elements, thus it is
+not feasible to use data structure metadata to infer the mapping.
+
+A profile study of the VOCSIFTFisher pipeline shows that the actual data size is 840.9~GB and the metadata size
+is 61.3~GB. Writing only metadata can reduce the total I/O amount by a factor of 13.7x.
+
+For the actual data, Gineala only stores the input dataset for the very beginning transformer as mandatory. 
+Users can configure the Gineala to make decisions for other transformers' input and output datasets.
+
+
+
 
 \subsection{Lineage I/O}
 \zhaonote{what data to store}
