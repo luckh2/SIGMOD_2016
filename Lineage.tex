@@ -338,6 +338,7 @@ the lineage for other purposes.
 \end{figure}
 
 \subsection{Lineage}
+\label{sec:Design-Lineage}
 For each transformer, Gineala collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
 The model stores the trained model of an estimator generated transformer.
 The random parameter holds the information that guarantees the determinism of the transformer.
@@ -347,6 +348,9 @@ We view linear model estimators as transformers without model or random paramete
 but instead we keep track of the training parameters that are used to obtain the output model (the output dataset). 
 
 \subsection{Mapping}
+Mapping is a notion that describes the element-wise dependency in Gineala. 
+It is an abstraction that is independent from specific data structure in the scope of DenseVector, DenseMatrix, and Image.
+
 Consider a transformer that transforms a RDD of matrices to another RDD of matrices.
 A RDD of matrices can be understood as a distributed array of matrices that is distributed across a cluster.
 We observe that many transformations in various pipelines has narrow dependencies, where a output matrix
@@ -357,26 +361,25 @@ The left mapping is from an input RDD of matrices to an output RDD of matrices.
 \begin{center}
     \includegraphics[width=85mm]{pictures/narrowmapping}
 \caption {Left: The narrow mapping cases in the context of Resilient Distributed Dataset (RDD), rectangles are RDDS and rounded-corner rectangles are matrices.
-Right: Three element-wise mapping cases, mappings are shown with color highlights.
+Right: Four element-wise mapping cases, mappings are shown with color highlights.
     \label{fig:narrowmapping}
 }
 \end{center}
 \end{figure}
 
-Taking a pair of matrices and see the element-wise mapping, we see three types of mappings: 
-{\bf One Mapping}, in which case each output element only depends on one element with the same coordinates in the input matrix.
+Taking a pair of matrices, we see four types of element-wise mappings: 
+{\bf One Mapping}, in which case each output element only depends on one element with the same coordinate in the input matrix.
 {\bf All Mapping}, in which case each output element depends on all elements in the input matrix.
 {\bf Region Mapping}, in which a group of output elements depend on a group of input elements.
 {\bf Sample Mapping}, in which the output is a sample of the input.
 
-In general, we also see the narrow dependencies and the three mapping cases in transformers with data structures of 
-DenseVector and Images. 
-So Gineala pre-defines these three element-wise mappings. 
+In general, all three data structures, DenseVector, DenseMatrix and Image have these four mapping types. 
+So Gineala defines these four element-wise mapping types, and users can use these mapping types to declare lineage. 
 In the next section, we will introduce how Gineala's lineage interface exposes the lineage declaration interface with the mapping information.
 
-\zhaonote{saying One Mapping and All Mapping are symmetric.}
 
 \subsection{Region Mapping}
+\label{sec:Design-RegionMapping}
 As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the input elements in the corresponding region. If the output region has $N$ elements and the input region has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
 Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
 For SIFT, the input elements form a circle with a geographical center and the scale as its radius.
@@ -420,14 +423,12 @@ Users do not have to modify these two lineage types.
 This section discusses implementation details for lineage collection, I/O, and region mapping index.
 
 \subsection{Metadata Separation}
-\zhaonote{show a profile study of metadata size and actual data size, saying why metadata is mandatory, input/output datasets are optional}
 As discussed in \S\ref{sec:Req-Perf}, writing lineage to persistent storage can introduce a more dramatical slowdown for KeystoneML comparing
 to the Hadoop-based systems, since Spark seeks to eliminate unnecessary I/O between memory and persistent storage.
 One effective way to reduce the I/O overhead is reduce the lineage data size.
 
 Gineala reduces the lineage data size by 1) separating the metadata from the datasets, 2) tracking only the metadata mapping, 
-3) taking advantage of the mapping types specified by the user, 4) and writing datasets to persistent storage with a configurable 
-setting in the lineage instrumentation in the transformer.
+and 3) taking advantage of the mapping types specified by the user.
 
 In \S\ref{sec:Lin-Pipe-Data}, we say an element in a data structure has two properties: the coordinate and the value.
 We refer the coordinate as the metadata of a particular element and the value as the actual data. 
@@ -439,15 +440,24 @@ to find the metadata of the depending input elements and the actual data of thes
 So Gineala separates the metadata from actual data and only tracks the metadata mapping.
 
 Another lineage size reduction is contributed by user specified mapping types. 
-For the lineage type of {\em OneLineage} and {\em AllLineage}, it is simple for Gineala to infer the mapping from the
-metadata of the data structure. E.g., the height and width of a matrix. 
-In these case, Gineala only records the data structure metadata instead of individual mapping tuple.
-Similar approaches can be applied for {\em GatherLineage} and {\em LinComLineage}.
-While for {\em SampleLineage} and {\em RegionLineage}, the mapping is between two groups of elements, thus it is
-not feasible to use data structure metadata to infer the mapping.
+The {\bf One Mapping} and {\bf All Mapping} are the mapping types behind the OneLineage and AllLineage, respectively.
+Both the two mapping types are symmetric.
+In {\bf One Mapping} if an output element depends exactly on the input element with the same coordinate, 
+the input element value only propagates to that only output element. 
+Thus both the forward and backward query return the element that has the identical coordinate as the key.
+So is for {\bf All Mapping}, the dependency of all input elements to an output element indicates that every input element's value propagates to all output elements.
+Both the forward and backward query shall return all elements in the data structure.
+Thus for {\bf One Mapping} and {\bf All Mapping}, recording the metadata of the matrix is enough to answer the forward and backward query.
 
-A profile study of the VOCSIFTFisher pipeline shows that the actual data size is 840.9~GB and the metadata size
-is 61.3~GB. Writing only metadata can reduce the total I/O amount by a factor of 13.7x.
+In contrast, the {\bf Region Mapping} and {\bf Sample Mapping} are asymmetric. 
+{\bf Sample Mapping} is implemented as a subtype of {\bf Region Mapping}, as it samples a random subset of the input data structure and return that subset as output.
+We can describe the subset as a list of random regions (squares in column sampling of a matrix), with each input region maps to an output region.
+To record these two mapping types, metadata of data structures is not sufficient to answer the queries. 
+Gineala needs to record region level mappings instead.
+
+Putting all lineage size reduction strategies together, 
+a profile study of the VOCSIFTFisher pipeline shows that the actual data size is 840.9~GB and the metadata size is 61.3~GB. 
+Writing only metadata can reduce the total I/O amount by a factor of 13.7x.
 
 For the actual data, Gineala only stores the input dataset for the very beginning transformer as mandatory. 
 Users can configure the Gineala to make decisions for other transformers' input and output datasets.
@@ -455,20 +465,111 @@ Users can configure the Gineala to make decisions for other transformers' input 
 
 
 
-\subsection{Lineage I/O}
-\zhaonote{what data to store}
-Among these five data types, the transformer and the collection of mapping are mandatory. 
+\subsection{Actual Dataset Storage}
+In the previous section, we introduce how Gineala separates the metadata from actual data and saves the metadata mapping.
+However, Gineala still needs the actual data to answer the forward and backward query.
+
+Considering a multi transformer pipeline, with each transformer having its own input dataset and output dataset.
+The minimal actual dataset Gineala needs to save to persistent storage is the input dataset for the very beginning transformer, as
+the rest datasets can be reproduced by rerunning the pipeline with the input dataset.
+
+Intuitively, the maximal actual dataset Gineala can save to persistent storage contains all input datasets and output dataset for each transformer.
+Since a transformer's output dataset is also the input dataset for the succeeding transformer, thus the maximal dataset without duplicates
+should include output datasets of all transformers and the input dataset for the beginning transformer. 
+
+Fundamentally, this is a tradeoff between pipeline slowdown, storage space consumption and query overhead. 
+Storing the minimal actual dataset consumes the least space on disk along with the least writing overhead, 
+but access to the actual dataset other than the input introduces overhead due to reexecution of the pipeline or a part of the pipeline.
+Storing the maximal dataset consumes more disk space and more time, but queries over the actual dataset
+have a lower latency.
+
+Assuming Gineala collects lineage information that is complete for the whole pipeline, the space formed by the storage overhead 
+(slowdown depends on the storage overhead) and query overhead defines users' flexibility to make actual dataset storing decision.
+
+In other cases, users are only interested in one or few transformers. E.g. debugging the transformer implementation.
+He may preempt that transformer's lineage by recording all its input and output dataset. 
+And no lineage from other transformers is needed.
+Gineala supports such flexibility by letting the user declare and operate lineage for one or few transformers.
+In turn, the lineage collected in this case only supports query over each individual transformer.
+It these transformers form a sub-pipeline, users can query the lineage throughout this sub-pipeline with Gineala.
+
+As introduced in \S\ref{sec:Design-Lineage}, Gineala collects six types of data for lineage: the input dataset, the output dataset,
+the transformer itself, the mapping collection, the model, and the parameter.
+Among these six data types, the transformer and the collection of mapping are mandatory. 
 The input dataset is mandatory if the transformer is the very first of the pipeline. 
 Otherwise, the input dataset is optional.
 The output dataset is optional, as it can be reproduced by rerunning the transformer with the input dataset.
-\zhaonote{save to HDFS thorugh RDD abstraction, file path consistent with transformer nametag and the very original input RDD id}
+The model and parameter are optional.
+
+In terms of data size, the input dataset, the output dataset and the mapping collection is dominant. 
+Since all of these three datasets are of the type of RDD abstraction, Gineala calls the RDD primitive to write these datasets
+to HDFS, so that each partition is written into the local disk. 
+And loading these RDDs from HDFS can benefit from the locality.
+For other data types, we encapsulate them into a RDD and use the same approach to write them to HDFS.
+
+All these six datasets are written into a directory that is named by concatenating the transformer label, 
+the node sequence id in the pipeline, and the id of the initial input dataset. 
+With id of the initial input dataset, Gineala can figure out the branches of the pipeline.
+By looking into the input/output RDD id, Gineala is able to tell the sequence of each transformer in the pipeline.
+Combining the two previous operations, Gineala can build the lineage of a pipeline in the exact same sequence
+as the original pipeline.
 
 \subsection{Region Mapping Index}
 \label{sec:RegionIndex}
-\zhaonote{Direct, RTree, Kmeans}
+In \S\ref{sec:Design-RegionMapping}, we introduced the notion of region mapping and how we user higher-order function
+to describe the region for the purpose of less space consumption. We also present that query of such region mapping
+can be slow due to the encoding. In this section, we discuss three indexing strategies to speedup the query over the
+region mapping. 
+For simplicity, we only discuss forward query from the input to the output in this section.
+The backward query has identical properties and the forward query.
 
-\subsection{Replay}
-\zhaonote{replay single transformer and multiple transformers}
+We use the example in Figure~\ref{fig:example} in the following discussion.
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/example}
+\caption {A region mapping example, the left matrix is input and the right matrix is output. The mapping between the regions are shown using gray shades.
+    \label{fig:example}
+}
+\end{center}
+\end{figure}
+
+Table~\ref{tb:example} shows the mapping for each element and the regressed 2D region mapping.
+\begin{table}[ht]
+\begin{center}
+    \caption{Element-wise mapping and regressed region mapping of the example in Figure~\ref{fig:example}}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{1.75cm} | p{1.75cm} | p{1.75cm} | p{1.75cm} |}
+    \hline
+    Input & Region & Output & Region \\ \hline \hline
+    (0,0),...,(1,1) & Circle\_0 & (0,0),(1,0) & Square\_0 \\ \hline
+    (0,2),...,(1,3) & Circle\_1 & (0,1),(1,1) & Square\_1 \\ \hline
+    (2,0),...,(3,1) & Circle\_2 & (0,2),(1,2) & Square\_2 \\ \hline
+    (2,2),...,(3,3) & Circle\_3 & (0,3),(1,3) & Square\_3 \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:example}
+\end{center}   
+\end{table} 
+
+\subsubsection{No Index}
+We refer the non-index strategy as {\bf NoIndex}. 
+With this strategy, query an element needs to test if the key is within a input region for all input regions.
+If an element is in an input region, the query returns the output region with all output elements expanded.
+The {\bf NoIndex} strategy does not build any index, thus the space complexity is 0.
+The time complexity of a query is $O(k*N)$, where k is number of input regions and N is the number
+of elements in each region. For simplicity, the time complexity of a query with {\bf NoIndex} is $O(N^2)$.
+
+\subsubsection{Direct Index}
+The direct index strategy is referred as {\bf Direct} in the future discussion.
+To build the direct index, we use each input element as key and the associated region as the value.
+We rely on the underlying system for the optimization of storing repeated regions as an single object,
+then use an pointer to point to the region object. The space complexity of {\bf Direct} index is $O(N^2)$,
+and the time complexity of query is $O(1)$.
+
+\subsubsection{RTree Index}
+
+\subsubsection{KMeans Index}
+
 
 \section{Performance Measurements}
 \label{sec:Perf}
