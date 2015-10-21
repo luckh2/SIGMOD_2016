@@ -269,18 +269,120 @@ qBackward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qBackward(e).
 \end{split}
 \end{equation}
 
+\section{Requirements}
+\label{sec:Req}
+The requirements of the Gineala lineage system for KeystoneML can be viewed from the functionality and performance perspective.
+
+\subsection{Functional Requirements}
+Gineala should expose a programming interface for users to declare and operate the lineage of each transformer. 
+Gineala's built-in lineage should cover the most common lineage types and preserve the flexibility for users to declare their own lineage types.
+Gineala also requires an interactive interface for users to load recorded lineage and query over it.
+
+The single transformer lineage need to provide the forward query and backward query functionalities. 
+It is  guaranteed that the lineage across transformers can be queried in a chain, as long as the transformers
+can form a pipeline (the transformers' types conform the pipeline strong type checking).
+
+The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
+the lineage can reproduce the identical result and the original result even with the presence of random factors.
+In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
+
+\subsection{Performance Requirements}
+As Gineala incurs additional computation and I/O to record and save lineage, the overall pipeline performance is expected to slowdown.
+Especially for KeystoneML that is built upon Apache Spark, unlike other distributed computing framework such as Hadoop~\cite{HADOOP} 
+that writes/reads intermediate data to disk, any additional I/O can introduce a more significant slowdown. 
+The Hadoop-based lineage system Newt~\cite{logothetis13} reported a 20$\sim$50\% slowdown; 
+another Hadoop-based lineage system GMRW~\cite{ikeda11} observed a slowdown of 16$\sim$76\% depending on the workloads;
+the SciDB~\cite{brown10}-based SubZero~\cite{wu13} system introduced 50$\sim$150\% overhead. 
+We expect Gineala's slowdown to the original pipeline to be comparable to these systems.
+
+When Gineala records lineage, we face tradeoffs between performance slowdown, memory usage and disk space.
+In some cases, it may run additional computations on the collected lineage to reduce the lineage size. 
+E.g., regressing a sequence of coordinates to a higher order function. 
+In other cases, it may cache all lineage information for a transformer before writing it to the storage. 
+Gineala should be able to automatically instrument the lineage collection to adapt the constraints.
+
+Lineage information can be massive depending on the transformer, since the input dataset or the intermediate dataset of a pipeline can be large.
+In some transformers, the mapping between the input elements and output elements is complicated. 
+Regress the element-wise mapping to a higher order function can reduce the storage overhead, however it introduce latency when users
+query them. Thus Gineala requires indexing strategies for the recorded lineage to overcome this issue.
 
 \section{Design}
 \label{sec:Design}
-Figure~\ref{fig:architecture} shows the position of Gineala and its interactions with other components.
+Figure~\ref{fig:architecture} shows the overview of Gineala and its interactions with other components. 
+Rounded-corner rectangles are components around and inside KeystoneML. 
+The two-sided arrows indicate interactions between components.
+Users compose machine learning pipelines with KeystoneML and submit the compiled DAG to Spark.
+All computation and I/O are done through the Spark Resilient Distributed Dataset (RDD) abstraction.
+With Gineala, users can declare and operate lineage at the transformer level, 
+so that the compiled DAG also contains lineage recording and other operations, e.g., save to disk.
+Lineage in Gineala is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
+Users can load the stored lineage in HDFS to Spark interactive command line interface.
+By calling Gineala primitives, users can query elements of interest, replay transformers, or analyze
+the lineage for other purposes.
+
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/architecture}
-\caption {Gineala's interaction with other components.
+\caption {Overview of Gineala and its surrounding components.
     \label{fig:architecture}
 }
 \end{center}
 \end{figure}
+
+\subsection{Lineage}
+For each transformer, Gineala collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
+Among these five data types, the transformer and the collection of mapping are mandatory. 
+The input dataset is mandatory if the transformer is the very first of the pipeline. 
+Otherwise, the input dataset is optional.
+The output dataset is optional, as it can be reproduced by rerunning the transformer with the input dataset.
+The model is required if the transformer is an output of an estimator.
+The random parameter holds the information that guarantees the determinism of the transformer.
+
+For estimators, we only consider linear model estimators in the current implementation. 
+We view linear model estimators as transformers without model or random parameters, 
+but instead we keep track of the training parameters that are used to obtain the output model (the output dataset). 
+
+\subsection{Mapping}
+Consider a transformer that transforms a RDD of matrices to another RDD of matrices.
+A RDD of matrices can be understood as a distributed array of matrices that is distributed across a cluster.
+We observe that many transformations in various pipelines has narrow dependencies, where a output matrix
+only depends on one input matrix. Figure~\ref{fig:narrowmapping} shows this case. 
+The left mapping is from an input RDD of matrices to an output RDD of matrices. 
+
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/narrowmapping}
+\caption {Left: The narrow mapping cases in the context of Resilient Distributed Dataset (RDD), rectangles are RDDS and rounded-corner rectangles are matrices.
+Right: Three element-wise mapping cases.
+    \label{fig:narrowmapping}
+}
+\end{center}
+\end{figure}
+
+Taking a pair of matrices and see the element-wise mapping, we see three types of mappings: 
+{\bf One Mapping}, in which case each output element only depends on one element with the same coordinates in the input matrix.
+{\bf All Mapping}, in which case each output element depends on all elements in the input matrix.
+{\bf Region Mapping}, in which a group of output elements depend on a group of input elements.
+{\bf Sample Mapping}, in which the output is a sample of the input.
+
+In general, we also see the narrow dependencies and the three mapping cases in transformers with data structures of 
+DenseVector and Images. 
+So Gineala pre-defines these three element-wise mappings. 
+In the next section, we will introduce how Gineala's lineage interface exposes the lineage declaration interface with the mapping information.
+
+\subsection{Region Mapping}
+As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the elements in the mapped region. If the output region has $N$ elements and the input region has $M$ elements, the space complexity of storing such a mapping is $O(N*M).$
+
+\subsection{Lineage Type}
+Gineala defines two lineage interfaces at high level: NarrowLineage and GatherLineage. 
+NarrowLineage covers the lineage that has a narrow dependency property and GatherLineage covers the dependency in a gather pattern, where the transformer takes a sequence of RDD of data structures and transform them into a single RDD of data structures. 
+
+The NarrowLineage can then be further specified in a naming convention of mapping pattern. E.g., NarrowLineage that has One Mapping is named as OneLineage.
+For OneLineage and AllLineage, the users only need to pass the input dataset, output dataset, and the parameters, since Gineala can figure out the element-wise mapping from the metadata of the internal data structure.
+
+For RegionLineage and SampleLineage, Gineala requires the mapping collection for the declaration. Such a collection should be a RDD. 
+Each RDD element is a list of tuples.
+Each tuple is a pair of the input region and the output region.
 
 \section{Implementations}
 \label{sec:Impl}
