@@ -185,11 +185,36 @@ In this section, we briefly review the KeystoneML and introduces three use cases
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--Transformers, which perform deterministic data transformation, and Estimators, which ``learn'' Transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
+Figure~\ref{fig:vocsiftfisher} shows the VOCSIFTFisher pipeline. The pipeline uses Principal Component Analysis (PCA) and a gaussian Mixture Model (GMM) to build visual vocabularies for image classification.
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/VOCSIFTFisher}
+\caption {The VOCSIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
+    \label{fig:vocsiftfisher}
+}
+\end{center}
+\end{figure}
+
+Figure~\ref{fig:sourceextractor} is the SourceExtractor pipeline. 
+It processes images from the astronomical telescope, such as Sloan Digital Sky Survey (SDSS).
+The pipeline produces an object catalog for each input image as the result. 
+The object catalog include the object position, the object shape, and statistics of the object.
+
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/SourceExtractor}
+\caption {The SourceExtractor pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
+    \label{fig:sourceextractor}
+}
+\end{center}
+\end{figure}
+
 \subsubsection{Dense SIFT Features Visualization}
+
+\subsubsection{Code Debugging}
 
 \subsubsection{Astronomy Image and Catalog Validation}
 
-\subsubsection{Code Debugging}
 
 \section{Lineage}
 \label{sec:Lin}
