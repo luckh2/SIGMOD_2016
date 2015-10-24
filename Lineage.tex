@@ -239,6 +239,18 @@ Then we query the SIFTExtractor lineage for each SIFT feature and find out the m
 Finally, we query the GrayScaler lineage, and highlight the related pixels in the visualization.
 
 \subsubsection{Code Debugging}
+Another use of pipeline lineage information goes beyond understanding a single pipeline in isolation.
+In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
+Typical machine learning workflows are constructed via an iterative proces of refinement with a machine learning developer or data scientist in the loop.
+These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
+Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
+
+As a concrete example, consider the SIFT/Fisher Vector pipeline. 
+It has been shown that augmenting traditional SIFT descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
+However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
+By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM, and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
+By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory.
+
 
 \subsubsection{Astronomy Image and Catalog Validation}
 Users of the SourceExtractor pipeline have the images as inputs and the object catalogs as outputs.
