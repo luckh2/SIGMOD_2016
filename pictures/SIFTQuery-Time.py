@@ -17,25 +17,49 @@ Batch10KSDV = (6194.96, 564.33, 312.15, 300.34)
 
 
 ind = 0.1+np.arange(N)  # the x locations for the groups
-width = 0.2       # the width of the bars
+width = 0.3       # the width of the bars
 
-ax = plt.subplot()
-ax.set_ylim([1, 100000])
-ax.set_yscale("log", nonposx='clip')
-rects1 = ax.bar(ind, Random, width, color='blue', log='True', yerr=np.multiply(RandomSDV,3), ecolor='black')
-rects2 = ax.bar(ind+width, Batch100, width, color='orange', hatch="/", log='True', yerr=np.multiply(Batch100SDV,3), ecolor='black')
-rects3 = ax.bar(ind+2*width, Batch1K, width, color='red', hatch="x", log='True', yerr=np.multiply(Batch1KSDV,3), ecolor='black')
-rects4 = ax.bar(ind+3*width, Batch10K, width, color='green', hatch="\\", log='True', yerr=np.multiply(Batch10KSDV,3), ecolor='black')
+f, (ax, ax2) = plt.subplots(2, 1, sharex=True)
+ax.set_ylim([1000, 11000])
+ax2.set_ylim([0, 500])
 
+ax.spines['bottom'].set_visible(False)
+ax2.spines['top'].set_visible(False)
+ax.xaxis.tick_top()
+ax.tick_params(labeltop='off')
+ax2.xaxis.tick_bottom()
+
+rects1 = ax.bar(ind, Random, width, color='blue')
+rects2 = ax.bar(ind+width, Batch100, width, color='orange', hatch="/")
+rects3 = ax.bar(ind+2*width, Batch1K, width, color='red', hatch="x")
+#rects4 = ax.bar(ind+3*width, Batch10K, width, color='green', hatch="\\")
+ax2.bar(ind, Random, width, color='blue')
+ax2.bar(ind+width, Batch100, width, color='orange', hatch="/")
+ax2.bar(ind+2*width, Batch1K, width, color='red', hatch="x")
+#ax2.bar(ind+3*width, Batch10K, width, color='green', hatch="\\")
 ax.grid(True)
+ax2.grid(True)
 
+ax.set_yticklabels((1000, 6000, 11000), size='large')
+ax2.set_yticklabels((0, 100, 200, 300, 400, 500), size='large')
+
+args = dict(horizontalalignment='left', verticalalignment='bottom')
 # add some text for labels, title and axes ticks
-ax.set_xlabel('Region Lineage Index Strategy', size='x-large')
-ax.set_ylabel('Query Turnaround (miliseconds)', size='x-large')
-ax.set_xticks(ind+0.4)
-ax.set_xticklabels( ('NoIndex', 'RTree', 'KMeans-1', 'KMeans-5'), size='x-large') 
-plt.yticks(size='large')
-ax.legend( (rects1[0], rects2[0], rects3[0], rects4[0]), ('Random', 'Batch100', 'Batch1000', 'Batch10000'), loc='best')
+ax2.set_xlabel('Region Lineage Index Strategy', size='x-large')
+ax2.set_ylabel('Query Turnaround (ms)', size='x-large', labelpad=20, **args)
+ax.set_xticks(ind+0.45)
+ax2.set_xticklabels( ('NoIndex', 'RTree', 'KMeans-1', 'KMeans-5'), size='x-large') 
+ax.legend( (rects1[0], rects2[0], rects3[0]), ('Random', 'Batch100', 'Batch1000'), loc='best')
+ax.yaxis.set_ticks((1000, 6000, 11000))
+
+d = .015
+kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
+ax.plot((-d,+d),(-d,+d), **kwargs)      # top-left diagonal
+ax.plot((1-d,1+d),(-d,+d), **kwargs)    # top-right diagonal
+
+kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
+ax2.plot((-d,+d),(1-d,1+d), **kwargs)   # bottom-left diagonal
+ax2.plot((1-d,1+d),(1-d,1+d), **kwargs) # bottom-right diagonal
 
 plt.show()
 
