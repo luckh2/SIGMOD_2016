@@ -143,6 +143,15 @@ This allows us to separate the metadata of the coordination system in each data 
 Recording the mapping between metadata and storing them consumes less storage space than that of actual data.
 Building index for the metadata mapping can reduce the query response time while paying the cost of time.
 
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/Conceptual}
+    \caption {A synthetic image processing pipeline with elements mapping highlighted in color scheme.
+    \label{fig:conceptual}
+}
+\end{center}
+\end{figure}
+
 In this paper, we investigate the above tradeoffs in the context of the KeystoneML machine learning pipeline that is built on
 top of Apache Spark~\cite{zaharia12}. In particular, we study 1) various data storage options given a space or a query latency constraint, 
 2) a set of indexing algorithms with different memory consumption, disk space, building overhead, and query latency.
