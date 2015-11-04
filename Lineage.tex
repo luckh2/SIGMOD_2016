@@ -68,7 +68,7 @@
 
 \begin{document}
 
-\title{Gineala: Diagnosing Data with Machine Learning Pipeline Lineage}
+\title{Gineala: Debugging Machine Learning Pipeline with Lineage}
 
 \numberofauthors{3} 
 \author{
@@ -92,24 +92,23 @@
 \maketitle
 
 \begin{abstract}
-We present the Gineala lineage system as part of the KeystoneML machine learning pipeline to provide
-users the capability of end-to-end data investigation. 
-Practically, users can better understand the machine learning process and results with such analysis.
-They can also possibly identify and remove data anomalies in the dataset, then replay the training or
-prediction phase with clean data.
+Lineage information of a machine learning pipeline can help users and practitioners 
+better interpret the results, investigate data anomalies, and debug the code.
+In this paper, we formulate the machine learning pipeline lineage information within the context of spatial database
+by viewing a data transformation as a mapping between two multi-dimensional spaces.
+We identify five primitive mapping types with which complex mappings can be composed of. 
+We introduce the higher-order function approach to describe a geometry in multi-dimensional space to save storage space.
+We investigate spatial indexing algorithms to speedup the lineage query and study the
+lower and upper bound of performance penalty, memory usage, and disk space introduced by materialized intermediate data.
+
+We implement the above ideas and present the Gineala lineage system as part of the KeystoneML machine learning pipeline.
 Gineala collects lineage at the transformer level by recording the computation itself, the mapping
-between input and output elements, and optionally the input/output dataset along with a placeholder
-for random factors. 
-Gineala stores the lineage data on the underneath file system, and builds index over the lineage data
-according to the lineage type. 
-Among the four lineage types, the region lineage is often problematic, as storing and querying it with
-native solution incurs unacceptable memory consumption and disk storage. 
-We introduce a higher order function solution to describe region lineage, and investigate a number of indexing
-algorithms to expedite queries. 
-Experiments show that our higher order function solution reduce the storage overhead for region lineage 
-by an oder of magnitude, and the indexing algorithms can speedup the random and batch query by 168x and 45x,
-respectively.
-We also present two use case studies of Gineala for image classification and astronomy object detection.
+between input and output,  the input/output dataset, the model, and the random factors. 
+Gineala builds the index of the mapping and stores the lineage information on the file system. 
+Experiments show that the higher-order function solution reduces the storage overhead by an oder of magnitude, 
+and the indexing algorithms can speedup the random and batch query by 168x and 45x, respectively.
+\zhaonote{add performance penalty and RAM/storage overhead}
+
 \end{abstract}
 
 % A category with the (minimum) three required fields
