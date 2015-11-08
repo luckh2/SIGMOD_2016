@@ -43,10 +43,11 @@ ax2.grid(True)
 ax.set_yticklabels((1000, 6000, 11000), size='large')
 ax2.set_yticklabels((0, 100, 200, 300, 400, 500), size='large')
 
-args = dict(horizontalalignment='left', verticalalignment='bottom')
+#args = dict(horizontalalignment='left', verticalalignment='bottom')
 # add some text for labels, title and axes ticks
 ax2.set_xlabel('Region Lineage Index Strategy', size='x-large')
-ax2.set_ylabel('Query Turnaround (ms)', size='x-large', labelpad=20, **args)
+ax2.set_ylabel('Query Turnaround (ms)', size='x-large', labelpad=20)
+ax2.yaxis.set_label_coords(-0.1, 1.0)
 ax.set_xticks(ind+0.45)
 ax2.set_xticklabels( ('NoIndex', 'RTree', 'KMeans-1', 'KMeans-5'), size='x-large') 
 ax.legend( (rects1[0], rects2[0], rects3[0]), ('Random', 'Batch100', 'Batch1000'), loc='best')

@@ -4,17 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 N = 5
-Baseline = (792.02, 792.02, 792.02, 792.02, 792.02)
-Metadata = (0, 191.98, 191.98, 191.98, 191.98)
-Data = (0,345.57, 283.62, 296.05, 326.8)
-Index = (0, 0, 117.41, 428.07, 2158.33)
+Baseline = (61.32, 61.32, 61.32, 61.32, 61.32)
+Metadata = (0, 89.78, 89.78, 89.78, 89.78)
+Data = (0, 68.84, 67.92, 79.26, 73.49)
+Index = (0, 0, 33.9, 69.93, 348.95)
 
 
 ind = 0.125+np.arange(N)  # the x locations for the groups
 width = 0.75       # the width of the bars
 
 ax = plt.subplot()
-ax.set_ylim([0, 4000])
+#ax.set_ylim([0, 4000])
 rects1 = ax.bar(ind, Baseline, width, color='blue')
 rects2 = ax.bar(ind, Metadata, width, color='orange', bottom=Baseline, hatch="/")
 rects3 = ax.bar(ind, Data, width, color='green', bottom=np.add(Metadata,Baseline), hatch="\\")
