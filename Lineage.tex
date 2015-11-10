@@ -102,7 +102,7 @@
 \begin{abstract}
 Distributed machine learning (ML) frameworkss are increasingly popular as practitioners and researchers 
 can quickly build productive applications (ML pipelines) and execute them at scale. 
-However, debugging such a pipeline is often cumbersome due to the lack of system support for
+Debugging such a pipeline is often cumbersome due to the lack of system support for
 intermediate states recording and user interaction.
 In this paper, we explore the debuggability issue of distributed ML systems by leveraging the fine-grained 
 data lineage throughout ML pipelines. 
@@ -110,7 +110,7 @@ Specifically, we formulate the fine-grained data lineage as mappings between mul
 identify a suite of primitive lineage types based on its mapping patterns, 
 and investigate several recording and indexing strategies to reduce the storage consumption and improve the query performance.
 
-We present the Gineala lineage system as part of the KeystoneML, which is a distributed machine learning
+We present the Gineala lineage system and integrate it with KeystoneML, a distributed machine learning
 system built on top of Apache Spark. 
 Gineala exposes API derived from the primitive lineage types and collects fine-grained data lineage for each 
 data transformation by recording the input datasets, the output datasets and the mapping between them along
@@ -172,20 +172,22 @@ the interface of the lineage system needs to be concise;
 capturing fine-grained data lineage introduces performance penalty;
 lineage querying needs to be responsive.
 
-For a concise lineage system interface, we identify seven primitive lineage types by formulating the cell-level mapping 
+For a concise lineage system interface, we identify six primitive lineage types by formulating the cell-level mapping 
 of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
 Higher-dimensional space can collapse/expand to lower-dimentional space along one dimension at a time, 
-resulting in collapse mapping(\textcircled{1}) and expansion mapping(\textcircled{5}, \textcircled{6}). 
-The mapping between spaces with the same number of dimensions can be identity mapping, all mapping(\textcircled{8}), 
-geometry mapping(\textcircled{2}, \textcircled{4}), and linear-combination mapping(\textcircled{3}, \textcircled{7}).
+resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{5}, \textcircled{6}). 
+The mapping between spaces with the same number of dimensions can be {\bf identity} mapping, {\bf all} mapping(\textcircled{8}), 
+{\bf geometry} mapping(\textcircled{2}, \textcircled{4}), and {\bf linear-combination} mapping(\textcircled{3}, \textcircled{7}).
 A formal definition of the mapping types is in \S\ref{sec:Lin}.
 Users can declare the according lineage type for individual data transformations.
+For the transformations that are not covered by these primitive types, users can pass in a function that describes the
+mapping as a parameter of the lineage.
 
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Conceptual}
     \caption {A synthetic image classfication pipeline with elements mapping highlighted in color scheme. 
-    \textcircled{1}: converts multi-channel image to gray scale.
+    \textcircled{1}: Conversion of multi-channel image to gray scale.
     \textcircled{2}: SIFT Feature extraction.
     \textcircled{3}: PCA reduces vector demension.
     \textcircled{4}: Vector sampling.
@@ -220,7 +222,7 @@ of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
 Upon query, Gineala can load the lineage information from storage and reconstruct the lineage chain.
 Users have the flexibility to specify either to reconstruct a single transformer lineage, a partial chain, or the whole chain.
 
-By examining the KeystoneML code base, we see that Gineala's lineage interface covers x\% of the existing transformers.
+By examining the KeystoneML code base, we see that Gineala's lineage interface covers 87\% (39 out of 45) of the existing transformers.
 Combining the high-order function approach and spatial indexing strategies, 
 the geometry lineage query runs 2x-31x faster and storage consumption is reduced from $O(kN^2)$
 to $O(k)$, assuming k is the number of mappings, N is the number of input and output elements in each geometry. 
@@ -235,7 +237,7 @@ In summary, we make the following contributions in this work:
 \item{} We present a high-order function to describe the geometry to reduce storage overhead.
 \item{} We present and evaluate various spatial indexing strategy to improve the query performance.
 \item{} We present the lower and upper bound of the amount of data that needs to be collected to enable complete pipeline lineage.
-\item{} We present three real use case of using fine-grained data lineage for data, code, and results debugging.
+\item{} We present three real uses case of using fine-grained data lineage for data, code, and results debugging, respectively.
 \end{shortlist}
 
 %The rest of the paper is organized as following: 
