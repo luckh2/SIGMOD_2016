@@ -153,8 +153,8 @@ use cases. These solutions are often use case specific, performance degradation 
 management due to the demand for multiple versions of a pipeline.
 
 On the other hand, fine-grained data lineage at data structure cell-level (e.g. elements of a matrix) -- the mapping between
-input elements to output elements and according computation -- can provide useful information for the
-debugging purpose~\cite{widom04}. The user of the {\bf Data Debugging} case can trace the propagation of the corrupted training
+input elements to output elements and according computation -- can provide useful information for
+debugging~\cite{widom04}. The user of the {\bf Data Debugging} case can trace the propagation of the corrupted training
 data item from the beginning step forward until the step before model training to figure out the affected features.
 Then the user traces the affected features backward and confirms these affected features only depend on the corrupted
 data item. At this point, the users can remove the affected features directly from the input of the model training step, 
@@ -175,10 +175,10 @@ lineage querying needs to be responsive.
 For a concise lineage system interface, we identify six primitive lineage types by formulating the cell-level mapping 
 of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
 Higher-dimensional space can collapse/expand to lower-dimentional space along one dimension at a time, 
-resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{5}, \textcircled{6}). 
-The mapping between spaces with the same number of dimensions can be {\bf identity} mapping, {\bf all} mapping(\textcircled{8}), 
-{\bf geometry} mapping(\textcircled{2}, \textcircled{4}), and {\bf linear-combination} mapping(\textcircled{3}, \textcircled{7}).
-A formal definition of the mapping types is in \S\ref{sec:Lin}.
+resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
+The mapping between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
+{\bf geometry} mapping(\textcircled{2}, \textcircled{4}), and {\bf linear-combination} mapping(\textcircled{3}, \textcircled{8}).
+A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 Users can declare the according lineage type for individual data transformations.
 For the transformations that are not covered by these primitive types, users can pass in a function that describes the
 mapping as a parameter of the lineage.
@@ -191,10 +191,11 @@ mapping as a parameter of the lineage.
     \textcircled{2}: SIFT Feature extraction.
     \textcircled{3}: PCA reduces vector demension.
     \textcircled{4}: Vector sampling.
-    \textcircled{5}: Vector combining.
-    \textcircled{6}: Matrix vectorizing.
-    \textcircled{7}: Lineage model prediction.
-    \textcircled{8}: Selection of the index with maximum value.
+    \textcircled{5}: Conversion from float to double.
+    \textcircled{6}: Vector combining.
+    \textcircled{7}: Matrix vectorizing.
+    \textcircled{8}: Lineage model prediction.
+    \textcircled{9}: Selection of the index with maximum value.
     \label{fig:conceptual}
 }
 \end{center}
@@ -209,7 +210,7 @@ of metadata. We introduce an high-order function approach to describe each geome
 each pair of geometries to reduce the storage consumption. We also investigate various indexing strategies for better
 query performance for geometry mapping.
 
-We present the Gineala, a lineage collecting and serving system that implements the above general solutions.
+We present Gineala, a lineage collecting and serving system that implements the above general solutions.
 Ginealal is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
 KeystoneML exposes two building blocks: transformers and estimators. 
 A transformer applies a deterministic unary function to data items and produce new data items.
@@ -257,6 +258,7 @@ In this section, we briefly review the KeystoneML and introduces three use cases
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--Transformers, which perform deterministic data transformation, and Estimators, which ``learn'' Transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
+We select three use cases from real ML pipelines, these three cases are representative for data debuggging, code debugging, and results debugging, respectively.
 %\begin{figure*}
 %\centering
 %\begin{minipage}{.6\linewidth}
@@ -271,6 +273,37 @@ KeystoneML is an application framework designed for the implementation of robust
 %  \label{fig:sourceextractor}
 %\end{minipage}
 %\end{figure*}
+
+\subsubsection{Data Debugging}
+Figure~\ref{fig:mnistrandomfft} shows the MNISTRandomFFT pipeline that classifies hand written digit. 
+The user of this pipeline trains the linear model by feeding the featurized dataset as results of VectorCombiner to the Linear Solver.
+Later, the user finds a corrupted data item in the training dataset and he wants to update the linear model by removing the impact
+of this corrupted data item. 
+As a native solution, one can always clean the dataset by removing the data item and rerun the whole pipeline.
+With the fine-grained lineage information, we can figure out the propagation of the corrupted data item in the pipeline,
+then remove the affected data items that only depend on the corrupted data item.
+Specifically for this use case, we chain the lineage information from the beginning of the pipeline till VectorCombiner.
+With forward query and backward query, we confirm that the corrupted data item, a 784 dimensional vector, only affects
+a 2048 dimensional vector as the output of VectorCombiner, and vice versa. So instead of rerunning the whole pipeline, 
+we can filter the output of VectorCombiner to remove the corresponding vector, and feed the cleaned dataset to the linear solver.
+In this way, debugging latency is reduced by skipping the repeated computation in the pipeline.
+
+\begin{figure}[ht]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/MNISTRandomFFT}
+    \caption {The MNISTRandomFFT pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
+    \label{fig:mnistrandomfft}
+}
+\end{center}
+\end{figure}
+
+\subsubsection{Code Debugging}
+Another use of pipeline lineage information goes beyond understanding a single pipeline in isolation.
+In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
+Typical machine learning workflows are constructed via an iterative proces of refinement with a machine learning developer or data scientist in the loop.
+These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
+Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
+
 Figure~\ref{fig:vocsiftfisher} shows the VOCSIFTFisher pipeline. The pipeline processes the VOC dataset and classifies each image into a particular category.
 This pipeline uses Principal Component Analysis (PCA) and a gaussian Mixture Model (GMM) to build visual vocabularies for image classification.
 \begin{figure}[ht]
@@ -282,6 +315,14 @@ This pipeline uses Principal Component Analysis (PCA) and a gaussian Mixture Mod
 \end{center}
 \end{figure}
 
+As a concrete example, consider the SIFT/Fisher Vector pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
+It has been shown that augmenting traditional SIFT descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
+However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
+By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM, and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
+By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory.
+
+
+\subsubsection{Results Debugging}
 Figure~\ref{fig:sourceextractor} is the SourceExtractor pipeline. 
 It processes images from the astronomical telescope, such as Sloan Digital Sky Survey (SDSS).
 The pipeline produces an object catalog for each input image as the result. 
@@ -296,35 +337,6 @@ The object catalog include the object position, the object shape, and statistics
 \end{center}
 \end{figure}
 
-\subsubsection{Dense SIFT Features Visualization}
-In the VOCSIFTFisher pipeline, the SIFTExtractor transformer extracts dense SIFT features from the gray scaled image then passes the vectors to a ColumnSampler.
-The PCA estimator uses the sampled SIFT features to train the PCA model. 
-A user wants to track the exact SIFT features that are used to train the PCA mode to understand this procedure.
-However, the massive amount of features makes it almost impossible for humans to track in mind.
-Practically, the VOC2007 dataset has 5,011 images in the training set. 
-The SIFT Extractor produces $\sim$50,000 SIFT features form each image, with each feature as a 128 dimensional vector.
-
-A visualization of these sampled SIFT features over images is a good way to present such information.
-Such a visualization requires the lineage of the GrayScaler, the SIFT Extractor, and the Column Sampler.
-For each sampled SIFT feature, we query the ColumnSampler lineage backward to find out the original SIFT features.
-Then we query the SIFTExtractor lineage for each SIFT feature and find out the mapping input pixels for each SIFT feature.
-Finally, we query the GrayScaler lineage, and highlight the related pixels in the visualization.
-
-\subsubsection{Code Debugging}
-Another use of pipeline lineage information goes beyond understanding a single pipeline in isolation.
-In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
-Typical machine learning workflows are constructed via an iterative proces of refinement with a machine learning developer or data scientist in the loop.
-These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
-Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
-
-As a concrete example, consider the SIFT/Fisher Vector pipeline. 
-It has been shown that augmenting traditional SIFT descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
-However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
-By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM, and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
-By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory.
-
-
-\subsubsection{Astronomy Image and Catalog Validation}
 Users of the SourceExtractor pipeline have the images as inputs and the object catalogs as outputs.
 A typical analysis involves the comparison between the output catalogs and the existing catalogs from previous surveys or observations.
 Given an object in the output catalogs that was not recorded before, the astronomer may look into the image finding out the
@@ -495,6 +507,7 @@ We view linear model estimators as transformers without model or random paramete
 but instead we keep track of the training parameters that are used to obtain the output model (the output dataset). 
 
 \subsection{Mapping}
+\label{sec:Design-Mapping}
 Mapping is a notion that describes the element-wise dependency in Gineala. 
 It is an abstraction that is independent from specific data structure in the scope of DenseVector, DenseMatrix, and Image.
 
