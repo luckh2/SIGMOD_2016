@@ -65,6 +65,14 @@
 \newcommand{\note}[1]{}
 \fi
 
+\newenvironment{shortlist}{
+        \vspace*{-0.5em}
+  \begin{itemize}
+  \setlength{\itemsep}{-0.1em}
+}{
+  \end{itemize}
+        \vspace*{-0.5em}
+}
 
 \begin{document}
 
@@ -92,14 +100,14 @@
 \maketitle
 
 \begin{abstract}
-Distributed machine learning (ML) systems are increasingly popular as practitioners and researchers 
+Distributed machine learning (ML) frameworkss are increasingly popular as practitioners and researchers 
 can quickly build productive applications (ML pipelines) and execute them at scale. 
 However, debugging such a pipeline is often cumbersome due to the lack of system support for
 intermediate states recording and user interaction.
 In this paper, we explore the debuggability issue of distributed ML systems by leveraging the fine-grained 
 data lineage throughout ML pipelines. 
 Specifically, we formulate the fine-grained data lineage as mappings between multi-dimensional spaces,
-identify a suite of primitive lineage types based on its dataflow and cross-space mapping patterns, 
+identify a suite of primitive lineage types based on its mapping patterns, 
 and investigate several recording and indexing strategies to reduce the storage consumption and improve the query performance.
 
 We present the Gineala lineage system as part of the KeystoneML, which is a distributed machine learning
@@ -119,7 +127,7 @@ use case.
 %\keywords{ACM proceedings, \LaTeX, text tagging}
 
 \section{Introduction}
-Machine learning systems are increasingly popular as practitioners and researchers can quickly
+Machine learning frameworks are increasingly popular as practitioners and researchers can quickly
 build productive applications (referred as ML pipelines in the rest of this paper) with a high-level 
 programming language to pipeline the data preparation, feature extraction, model training, 
 and prediction. 
@@ -130,26 +138,26 @@ SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a dis
 Debugging such a ML pipeline with datasets in a distributed environment can be problematic due to
 the lack of system support of memory states capturing and user interaction.
 To motivate, we present three typical use cases for ML pipeline debugging:
-\begin{itemize}
+\begin{shortlist}
 \item{\bf Data Debugging}: In a hand-written digit classification pipeline, a user wants to remove one
-corrupted training data point and retrain the model.
+corrupted training data item and retrain the model.
 \item{\bf Code Debugging}: In an image classification pipeline, a user wants to verify the correctness of 
 the positional information of features. 
 \item{\bf Results Debugging}: In an astroid extraction pipeline, an astronomer wants to find astroids whose
 brightness are above a threshold then locate them in the input images.
-\end{itemize}
+\end{shortlist}
 
 In practice, users instrument the steps of interest to gather memory states and store them in a persistent storage
 for later examination. Users may try multiple solutions until the memory states have sufficient information for the
-use cases. These solutions are often use case specific, performance degradation prone, and can introduce high code
-complexity due to the demand for multiple versions of an ML pipeline.
+use cases. These solutions are often use case specific, performance degradation prone, and can complicate code
+management due to the demand for multiple versions of a pipeline.
 
 On the other hand, fine-grained data lineage at data structure cell-level (e.g. elements of a matrix) -- the mapping between
 input elements to output elements and according computation -- can provide useful information for the
 debugging purpose~\cite{widom04}. The user of the {\bf Data Debugging} case can trace the propagation of the corrupted training
-data point from the beginning step forward until the step before model training to figure out the affected features.
+data item from the beginning step forward until the step before model training to figure out the affected features.
 Then the user traces the affected features backward and confirms these affected features only depend on the corrupted
-data point. At this point, the users can remove the affected features directly from the input of the model training step, 
+data item. At this point, the users can remove the affected features directly from the input of the model training step, 
 and rerun the training process with the cleaned dataset. The user of the {\bf Code Debugging} case can trace the lineage
 information of the feature extraction step backward to figure out the correlated input pixels in the image. Visualizing
 these pixels can help the user confirm the correctness of feature extraction immediately. The astronomer of the {\bf Results Debugging}
@@ -157,88 +165,87 @@ case can first filter the results and find these astroids that are above the bri
 backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
 if it is a new astroid or an false detection introduced by cosmic ray. 
 
-In this paper, we explore the debuggability of distributed machine learning systems by leveraging the fine-grained data lineage.
-We formulate the data transformation in the ML pipeline as a multi-dimensional space transformation. 
-As shown in Figure~\ref{fig:conceptual}, the mapping of an ML pipeline can be viewed as a sequence of multi-dimentional space transformations. 
+
+We seek to enable the debuggability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
+However, building such a lineage system is challenging because: 
+the interface of the lineage system needs to be concise;
+capturing fine-grained data lineage introduces performance penalty;
+lineage querying needs to be responsive.
+
+For a concise lineage system interface, we identify seven primitive lineage types by formulating the cell-level mapping 
+of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
 Higher-dimensional space can collapse/expand to lower-dimentional space along one dimension at a time, 
-resulting in collapse mapping and expansion mapping. 
-The mapping between spaces with the same dimensions can be one-to-one mapping, all-to-one mapping, 
-region mapping, sample mapping, and linear-combination mapping.
-Thus, we define seven lineage primitive types based on the cell-level mapping. 
+resulting in collapse mapping(\textcircled{1}) and expansion mapping(\textcircled{5}, \textcircled{6}). 
+The mapping between spaces with the same number of dimensions can be identity mapping, all mapping(\textcircled{8}), 
+geometry mapping(\textcircled{2}, \textcircled{4}), and linear-combination mapping(\textcircled{3}, \textcircled{7}).
+A formal definition of the mapping types is in \S\ref{sec:Lin}.
 Users can declare the according lineage type for individual data transformations.
-Specifically for region mapping, we introduce an high-order function approach to describe the geometry for
-less storage consumption and investigate various indexing strategies of the geometry mapping for higher query performance.
-
-%We present the Gineala lineage system, which is built upon the KeystoneML distributed machine learning system. 
-
-%Recording fine grained lineage information for modern distributed computing frameworks can help
-%users and practitioners understand the data analysis results, find data anomalies from massive
-%datasets, and replay the computation with cleaned data. 
-%Users can look into the lineage for a highly rated movie to understand the nature of the supporting
-%group. They can also investigate how an erroneous data item propagates in the analysis and replay
-%the computation by removing the polluted data at a stage that incurs the least re-execution cost.
-%In general, a lineage system needs to be able to collect the fine grained lineage, 
-%provide forward and backward query along the computation stages, and replay partial computation
-%that are of users' interest.
-
-%Building such a lineage system is particularly challenging because: 
-%1) lineage collection can slowdown the analysis dramatically;
-%2) lineage data can be hard to capture due to intermediate data's lack of structure;
-%3) lineage data can exceed the disk storage space; 
-%4) interaction between users and the lineage system needs to be responsive.
-
-%Specifically for a distributed machine learning system, some challenges can exacerbate: 
-%The slowdown introduced by recording lineage to disks can be significant as the computing engine 
-%may run applications completely in memory without writing/reading intermediate data to/from disks. 
-%The dataset processed by a distributed machine learning system is usually larger that runs on a desktop.
-%On the other hand, dedicated distributed machine learning systems have the intermediate data between
-%stages well structured as vectors, matrices, and images (2D images with channels). 
-%This allows us to separate the metadata of the coordination system in each data structure from the actual data. 
-%Recording the mapping between metadata and storing them consumes less storage space than that of actual data.
-%Building index for the metadata mapping can reduce the query response time while paying the cost of time.
 
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Conceptual}
-    \caption {A synthetic image processing pipeline with elements mapping highlighted in color scheme.
+    \caption {A synthetic image classfication pipeline with elements mapping highlighted in color scheme. 
+    \textcircled{1}: converts multi-channel image to gray scale.
+    \textcircled{2}: SIFT Feature extraction.
+    \textcircled{3}: PCA reduces vector demension.
+    \textcircled{4}: Vector sampling.
+    \textcircled{5}: Vector combining.
+    \textcircled{6}: Matrix vectorizing.
+    \textcircled{7}: Lineage model prediction.
+    \textcircled{8}: Selection of the index with maximum value.
     \label{fig:conceptual}
 }
 \end{center}
 \end{figure}
 
-%In this paper, we investigate the above tradeoffs in the context of the KeystoneML machine learning pipeline that is built on
-%top of Apache Spark~\cite{zaharia12}. In particular, we study 1) various data storage options given a space or a query latency constraint, 
-%2) a set of indexing algorithms with different memory consumption, disk space, building overhead, and query latency.
-%Based on these studies, we present the Gineala lineage system as a module of KeytoneML. 
-%Gineala abstracts lineage as input dataset, output dataset, metadata mapping, computation, and random factor. 
-%Gineala lets users declare lineage in five pre-defined categories: {\bf One}, {\bf All}, {\bf Region}, {\bf LinCom} (Lineage Combination), and {\bf Gather}.
-%It separates the metadata (coordination system of the data structure) from the actual data, and records the metadata mapping. 
-%It incorporates metadata type checking for inter-stage lineage query and builds index for {\bf Region} lineage for responsive query.
-%Gineala stores lineage information in HDFS~\cite{shvachko10} as Apache Spark's resilient distributed dataset(RDD). 
-%It can load the lineage information into KeystoneML in-memory, modify or remove data item from the input dataset, and replay
-%the computation interactively.
+The performance penalty introduced by lineage capturing comes mostly from persisting in-memory data to storage.
+In the context of data transformation, there are three potential datasets: the input, the output, and mapping between them.
+Recording only the metadata (coordinates) mapping rather than the actual data value places a lower bound of the amount
+of data the lineage system needs to capture. The actual dataset can be derived by rerunning the pipeline.
+Among the mapping types, geometry mapping takes more storage space than others due to the arbitrary between two collections
+of metadata. We introduce an high-order function approach to describe each geometry and record the mapping between
+each pair of geometries to reduce the storage consumption. We also investigate various indexing strategies for better
+query performance for geometry mapping.
 
-%The contributions of this paper are: 
-%1) the use of higher-order function to describe {\bf Region} lineage;
-%2) the indexing algorithm that speeds up the query by 45x-168x;
-%3) the open source implementation of the Gineala system.
+We present the Gineala, a lineage collecting and serving system that implements the above general solutions.
+Ginealal is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
+KeystoneML exposes two building blocks: transformers and estimators. 
+A transformer applies a deterministic unary function to data items and produce new data items.
+An estimator takes a collection of data items, and feed them to a training procedure,  and produces a transformer.
+Gineala interacts with KeystoneML in the transformers, where the users can declare the lineage type and instrumentation.
+Gineala collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
+along with the computation and the optional model.
+Gineala stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
+of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
+Upon query, Gineala can load the lineage information from storage and reconstruct the lineage chain.
+Users have the flexibility to specify either to reconstruct a single transformer lineage, a partial chain, or the whole chain.
 
-%We use three real machine learning pipelines to show Gineala's functionalities and performance. 
-%RandomFFTMNIST is a pipeline for hand-written digit recognition. 
-%VOCSIFTFisher is an image classification pipeline.
-%SourceExtractor is an astronomical image processing pipeline that detects objects in images produced by astronomy telescopes.
-%Our results show that by using the higher-order function for {\bf Region} lineage can reduce the the storage space by xxx. 
-%Indexing strategies with RTree and KMeans algorithms can speedup the query response time by a factor of xxx with overhead of xxx, respectively.
-%The overall slowdown for the three real pipelines are xxx, with xxx more memory and disk consupmtion.
+By examining the KeystoneML code base, we see that Gineala's lineage interface covers x\% of the existing transformers.
+Combining the high-order function approach and spatial indexing strategies, 
+the geometry lineage query runs 2x-31x faster and storage consumption is reduced from $O(kN^2)$
+to $O(k)$, assuming k is the number of mappings, N is the number of input and output elements in each geometry. 
+Our measurements with the three representative ML pipelines show that Gineala lineage capturing scales no worse than the
+ML pipelines.
+The performance penalty for the three fore-mentioned use cases ranges from 16\% to 41\%.
+The query for these use cases takes from 0.1~s to 1.8~s.
 
-The rest of the paper is organized as following: 
-\S\ref{sec:Background} introduces the background of KeystoneML and typical uses of fine-grained lineage systems. 
-\S\ref{sec:Lin} discusses lineage of a machine learning pipeline formally.
-\S\ref{sec:Design} discusses the general design of Gineala.
-\S\ref{sec:Impl} documents the Gineala implementation on KeystoneML with technical details
-We present the performance measurements in \S\ref{sec:Perf}.
-\S\ref{sec:Related} surveys existing lineage systems.
-We conclude and envision future work in \S\ref{sec:Conclusion}.
+In summary, we make the following contributions in this work:
+\begin{shortlist}
+\item{} We present a concise and powerful lineage system interface by formulating the cell-wise mapping in ML pipelines as multi-dimensional space transformation.
+\item{} We present a high-order function to describe the geometry to reduce storage overhead.
+\item{} We present and evaluate various spatial indexing strategy to improve the query performance.
+\item{} We present the lower and upper bound of the amount of data that needs to be collected to enable complete pipeline lineage.
+\item{} We present three real use case of using fine-grained data lineage for data, code, and results debugging.
+\end{shortlist}
+
+%The rest of the paper is organized as following: 
+%\S\ref{sec:Background} introduces the background of KeystoneML and typical uses of fine-grained lineage systems. 
+%\S\ref{sec:Lin} discusses lineage of a machine learning pipeline formally.
+%\S\ref{sec:Design} discusses the general design of Gineala.
+%\S\ref{sec:Impl} documents the Gineala implementation on KeystoneML with technical details
+%We present the performance measurements in \S\ref{sec:Perf}.
+%\S\ref{sec:Related} surveys existing lineage systems.
+%We conclude and envision future work in \S\ref{sec:Conclusion}.
 
 \section{Background}
 \label{sec:Background}
