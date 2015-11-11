@@ -311,10 +311,6 @@ By visualizing the features we could see that the new features added to our mode
 Users of ML pipelines often interpret the results, identify some potential data anomalies, then retrospect the supporting input data for better understanding.
 Fine-grained data lineage of ML pipelines have sufficient information for such investigation.
 
-One such use case is results validation in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
-that processes images from the telescopes and produces astronomical object catalogs. 
-The astronomical object catalog includes the position, shape, and other statistical properties of the object.
-
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SourceExtractor}
@@ -324,7 +320,9 @@ The astronomical object catalog includes the position, shape, and other statisti
 \end{center}
 \end{figure}
 
-
+One such use case is results validation in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
+that processes images from the telescopes and produces astronomical object catalogs. 
+The astronomical object catalog includes the position, shape, and other statistical properties of the object.
 In this case, astronomers find the bright objects over a threshold and validate that these objects are indeed astronomical objects rather
 than noise caused by cosmic rays.
 With the lineage information, astronomers can first filter the results to find the objects whose brightness is above a threshold.
@@ -338,14 +336,15 @@ In this section, we formally define the notion of pipeline, dataset, lineage and
 \subsection{Pipeline and Datasets}
 \label{sec:Lin-Pipe-Data}
 We define a dataset $I$ as a collection of structured data. In the scope of this work, the supported structures are: 
-DenseVector, DenseMatrix, and Image. DenseVector is a one dimensional data structure and DenseVector is
-two dimensional. Image is a three dimensional data structures that is defined by the height, the width and the number
-of channels of an image. 
+string, vector, matrix, and image. A vector or a string is a one dimensional data structure and a matrix is two dimensional. 
+For simplicity, we view string as a vector.
+An image is a three dimensional data structure that is defined by the height, the width and the number
+of channels. Putting these data structures in a collection, e.g. a RDD or a sequence, introduces one additional dimension.
 
 An element $e \in I$ has two properties: value $e.value$ and coordinates $e.coor$. 
 Combining the additional dimension in the collection with the data structure, 
 the coordinates of an element is a pair of integers, a triple of integers, or a quadruple of integers
-for DenseVector, DenseMatrix, and Image, respectively.
+for vector, matrix, and image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
 Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{(i+1)}$ as the output. 
