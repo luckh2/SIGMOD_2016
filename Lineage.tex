@@ -331,7 +331,7 @@ Either through mathematical analysis or human intervention, they are able to val
 
 \section{Lineage}
 \label{sec:Lin}
-In this section, we formally define the notion of pipeline, dataset, lineage and its associated operations of query and replay.
+In this section, we formally define the notion of ML pipeline, dataset, lineage and its associated operations of query and replay.
 
 \subsection{Pipeline and Datasets}
 \label{sec:Lin-Pipe-Data}
@@ -347,11 +347,12 @@ the coordinates of an element is a pair of integers, a triple of integers, or a 
 for vector, matrix, and image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
-Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{(i+1)}$ as the output. 
+Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{i+1}$ as the output: 
+$I_{i+1} = T_i(I_i)$. 
 Especially, we denote the output of the whole pipeline as $O = I_{n+1}$
 
 \subsection{Dataset Companion}
-Since transformers operate at the data structure (DenseVector, DenseMatrix, Image) level, we use the notation
+Since transformers operate at the data structure (vector, matrix, image) level, we use the notation
 $\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such that $\forall a \in \overline{I_i(e)}$,
 \[ a.value =
   \begin{cases}
@@ -373,7 +374,7 @@ described as: $\forall a \in \overline{I_i(e_1, ..., e_m)}$,
 \subsection{Data Lineage and Replay}
 Before defining the lineage, we need to introduce the relationship between the two data structures $A$ and $B$ with the same type.
 We say $A \subseteq B \text{ or } B \supseteq A$, $\text{if }\forall a \in A, \exists b \in B, s.t.\text{ } a \neq NaN \land a.coor = b.coor \land a.value = b.value$.
-By saying $A = B$, we mean $A \subseteq B \land B \subseteq A$.
+By saying $A = B$, we mean $A \subseteq B$ and $B \subseteq A$.
 
 We define the data lineage of a given element as the elements in the input dataset that is used to produce present element.
 The single transformer lineage is
@@ -388,23 +389,22 @@ Recursively, the lineage of a given element across multiple transformers can be 
 L(e) = \cup_{e' \in S(e)} L(e').
 \end{equation}
 
-We define the property of $Replay(e \in I_{i+1}) = \overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})$ in Equation~\ref{equa:SingleLineage}
-as the replay property, which means we can reproduce the output solely with its lineage and the corresponding transformer.
-The constraint of the replay property is that only the element $e$ is guaranteed to be the same as the original transformation 1
-if $\overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})$. In this case, the results of the replayed transformer may
-produce inconsistent results for elements other than $e$ in $I_{i+1}$. 
-In some cases, we see a stronger condition of $\overline{I_{i+1}(e)} = T_i(\overline{I_i(e_1, ..., e_m)})$, which indicates that
-the replayed results are exactly the same as the original results.
-
-The replay property for multiple elements require the lineage for all elements. Formally,
-$Replay(e_1,..,e_m \in I_{i+1}) = \overline{I_{i+1}(e_1,...,e_m)} \subseteq \cup_{e \in (e_1,...,e_m)} Replay(e) $.
+We define the property 
+\begin{equation}
+Replay(e \in I_{i+1}) = \overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})
+\end{equation}
+as the replay property, which means we can reproduce an output element $e$ by applying the corresponding transformer to its data lineage.
+The constraint of the replay property is that only the element $e$ is guaranteed to be the same as the original transformation,
+if $\overline{I_{i+1}(e)} \subset T_i(\overline{I_i(e_1, ..., e_m)})$. 
+In this case, the results of the replayed transformer may produce inconsistent results for elements other than $e$ in $I_{i+1}$. 
+Similarly, the replay property for multiple elements only guarantees the correctness of these elements themselves.
 
 \subsection{Data Lineage Query}
 The forward query of an element over data lineage of a pipeline $P$ returns $qForward(e) = \{e' | e \in L(e' \in O)\}$. 
 And the backward query of an element over data lineage returns $qBackward(e) = e' \in L(e)$.
 Specifically, the identifier of an element is its coordinates in the according data structure, so the query actually takes
 the coordinates of the input element as key, and query over the data lineage. The query that spans multiple transformers 
-use coordinates as intermediate data. Once the query reaches the final transformer, it associates the actual values
+use coordinates as intermediate data. Once the query reaches the final transformer, it can associate the actual values
 with the result element coordinates and return them.
 
 Queries of multiple elements can then be expressed as the union of the query for each element: 
