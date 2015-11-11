@@ -59,9 +59,11 @@
 %\draftfalse                                                                              
 \ifdraft
 \newcommand{\zhaonote}[1]{{\textcolor{cyan}    { ***Zhao:      #1 }}}
+\newcommand{\evannote}[1]{{\textcolor{red}    { ***Evan:      #1 }}}
 \newcommand{\note}[1]{ {\textcolor{red}    {\bf #1 }}}
 \else
 \newcommand{\zhaonote}[1]{}
+\newcommand{\evannote}[1]{}
 \newcommand{\note}[1]{}
 \fi
 
@@ -76,7 +78,7 @@
 
 \begin{document}
 
-\title{Gineala: Debugging Machine Learning Pipeline with Fine-grained Lineage}
+\title{Gineala: Debugging Machine Learning Pipelines with Fine-grained Lineage}
 
 \numberofauthors{3} 
 \author{
@@ -86,10 +88,10 @@
        \affaddr{University of California, Berkeley} \\
        \email{zhangzhao@berkeley.edu}    
 % 4th. author       
-\alignauthor Evan~Sparks\\\
+\alignauthor Evan~R.~Sparks\\\
        \affaddr{AMPLab}\\
        \affaddr{University of California, Berkeley}\\
-       \email{sparks@berkeley.edu}       
+       \email{sparks@cs.berkeley.edu}       
 % 6th. author
 \alignauthor Michael~J.~Franklin\\
        \affaddr{AMPLab}\\
@@ -103,18 +105,18 @@
 Distributed machine learning (ML) frameworks are increasingly popular as practitioners and researchers 
 can quickly build productive applications (ML pipelines) and execute them at scale. 
 Debugging such a pipeline is often cumbersome due to the lack of system support for
-intermediate states recording and user interaction.
-In this paper, we explore the debuggability issue of distributed ML systems by leveraging the fine-grained 
+recording intermediate state and user interaction.
+In this paper, we explore the debuggability issue of distributed ML systems by leveraging fine-grained 
 data lineage throughout ML pipelines. 
 Specifically, we formulate the fine-grained data lineage as mappings between multi-dimensional spaces,
 identify a suite of primitive lineage types based on its mapping patterns, 
 and investigate several recording and indexing strategies to reduce the storage consumption and improve the query performance.
 
 We present the Gineala lineage system and integrate it with KeystoneML, a distributed machine learning
-system built on top of Apache Spark. 
-Gineala exposes API derived from the primitive lineage types and collects fine-grained data lineage for each 
+application framework built on top of Apache Spark. 
+Gineala exposes an API derived from \emph{primitive lineage types} and collects fine-grained data lineage for each 
 data transformation by recording the input datasets, the output datasets and the mapping between them along
-with the computation, the model and random factors.
+with all information needed to reproduce the computation - including program logic, model parameters, and random seed values.
 Gineala efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
 Practically, the Gineala can reduce the storage consumption by up to 45x and speeds up the query performance
 by up to 31x. The performance penalty introduce by Gineala is 16\%-54\% depending on the pipeline and
@@ -128,14 +130,14 @@ use case.
 
 \section{Introduction}
 Machine learning frameworks are increasingly popular as practitioners and researchers can quickly
-build productive applications (referred as ML pipelines in the rest of this paper) with a high-level 
-programming language to pipeline the data preparation, feature extraction, model training, 
+build productive applications (referred to as ML pipelines in the rest of this paper) with a high-level 
+programming language to pipeline data preparation, feature extraction, model training, 
 and prediction. 
-Among these systems, Scikit-learn~\cite{pedregosa2011scikit} and TensorFlow~\cite{tensorflow15} 
+Among these systems, Scikit-learn~\cite{pedregosa2011scikit} and TensorFlow~\cite{tensorflow15} \evannote{tensorflow is distributed}
 are single-computer-based framework while Apache Mahout~\cite{owen2011mahout}, MLlib~\cite{meng2015mllib}, 
 SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
 
-Debugging such a ML pipeline with datasets in a distributed environment can be problematic due to
+Debugging such an ML pipeline with datasets in a distributed environment can be problematic due to
 the lack of system support of memory states capturing and user interaction.
 To motivate, we present three typical use cases for ML pipeline debugging:
 \begin{shortlist}
@@ -147,10 +149,11 @@ the positional information of features.
 brightness are above a threshold then locate them in the input images.
 \end{shortlist}
 
-In practice, users instrument the steps of interest to gather memory states and store them in a persistent storage
-for later examination. Users may try multiple solutions until the memory states have sufficient information for the
-use cases. These solutions are often use case specific, performance degradation prone, and can complicate code
+In practice, users instrument the steps of interest to gather intermediate state and store it in persistent storage
+for later examination. Users may try multiple solutions until this state contains sufficient information to support the
+use case. These solutions are often use case specific, performance degradation prone, and can complicate code
 management due to the demand for multiple versions of a pipeline.
+\evannotes{Given that this is a repeated pattern taken on by users of the system, it is natural to add fully automated support that is transparent to users in terms of performance and application complexity..}
 
 On the other hand, fine-grained data lineage at data structure cell-level (e.g. elements of a matrix) -- the mapping between
 input elements to output elements and according computation -- can provide useful information for
@@ -211,12 +214,12 @@ each pair of geometries to reduce the storage consumption. We also investigate v
 query performance for geometry mapping.
 
 We present Gineala, a lineage collecting and serving system that implements the above general solutions.
-Ginealal is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
+Gineala is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
 KeystoneML exposes two building blocks: transformers and estimators. 
 A transformer applies a deterministic unary function to data items and produce new data items.
 An estimator takes a collection of data items, and feed them to a training procedure,  and produces a transformer.
-Gineala interacts with KeystoneML in the transformers, where the users can declare the lineage type and instrumentation.
-Gineala collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
+Gineala interacts with KeystoneML at the Transformer level, where the users can declare the lineage type and instrumentation.
+Gineala collects five types of data for each Transformer: the input dataset, the output dataset, the mapping between them
 along with the computation and the optional model.
 Gineala stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
 of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
@@ -225,12 +228,12 @@ Users have the flexibility to specify either to reconstruct a single transformer
 
 By examining the KeystoneML code base, we see that Gineala's lineage interface covers 87\% (39 out of 45) of the existing transformers.
 Combining the high-order function approach and spatial indexing strategies, 
-the geometry lineage query runs 2x-31x faster and storage consumption is reduced from $O(kN^2)$
+the geometry lineage query runs 2x-31x \evannote{do you just want so say ``up to 31x'' in the intro} faster and storage consumption is reduced from $O(kN^2)$
 to $O(k)$, assuming k is the number of mappings, N is the number of input and output elements in each geometry. 
 Our measurements with the three representative ML pipelines show that Gineala lineage capturing scales no worse than the
 ML pipelines.
 The performance penalty for the three fore-mentioned use cases ranges from 16\% to 54\%.
-The query for these use cases takes from 0.1~s to 1.8~s.
+The query for these use cases takes from 0.1~s to 1.8~s. \evannote{Is this low enough that you can claim interactive response times on lineage queries?}
 
 In summary, we make the following contributions:
 \begin{shortlist}
