@@ -174,7 +174,7 @@ lineage querying needs to be responsive.
 
 For a concise lineage system interface, we identify six primitive lineage types by formulating the cell-level mapping 
 of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
-Higher-dimensional space can collapse/expand to lower-dimentional space along one dimension at a time, 
+Higher-dimensional space can collapse/expand to lower-dimensional space along one dimension at a time, 
 resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
 The mapping between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
 {\bf geometry} mapping(\textcircled{2}, \textcircled{4}), and {\bf linear-combination} mapping(\textcircled{3}, \textcircled{8}).
@@ -186,10 +186,10 @@ mapping as a parameter of the lineage.
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Conceptual}
-    \caption {A synthetic image classfication pipeline with elements mapping highlighted in color scheme. 
+    \caption {A synthetic image classification pipeline with elements mapping highlighted in color scheme. 
     \textcircled{1}: Conversion of multi-channel image to gray scale.
-    \textcircled{2}: SIFT Feature extraction.
-    \textcircled{3}: PCA reduces vector demension.
+    \textcircled{2}: Local feature extraction.
+    \textcircled{3}: Vector dimension reduction.
     \textcircled{4}: Vector sampling.
     \textcircled{5}: Conversion from float to double.
     \textcircled{6}: Vector combining.
