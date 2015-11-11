@@ -258,34 +258,20 @@ In this section, we briefly review the KeystoneML and introduces three use cases
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--Transformers, which perform deterministic data transformation, and Estimators, which ``learn'' Transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
-We select three use cases from real ML pipelines, these three cases are representative for data debuggging, code debugging, and results debugging, respectively.
-%\begin{figure*}
-%\centering
-%\begin{minipage}{.6\linewidth}
-%  \includegraphics[width=\linewidth]{pictures/VOCSIFTFisher}
-%  \caption{The VOCSIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.}
-%  \label{fig:vocsiftfisher}
-%\end{minipage}
-%\hspace{.05\linewidth}
-%\begin{minipage}{.3\linewidth}
-%  \includegraphics[width=\linewidth]{pictures/SourceExtractor}
-%  \caption{The SourceExtractor pipeline.}
-%  \label{fig:sourceextractor}
-%\end{minipage}
-%\end{figure*}
+We select three use cases from real ML pipelines, these three cases are representative for data debugging, code debugging, and results debugging, respectively.
 
 \subsubsection{Data Debugging}
-Figure~\ref{fig:mnistrandomfft} shows the MNISTRandomFFT pipeline that classifies hand written digit. 
-The user of this pipeline trains the linear model by feeding the featurized dataset as results of VectorCombiner to the Linear Solver.
-Later, the user finds a corrupted data item in the training dataset and he wants to update the linear model by removing the impact
-of this corrupted data item. 
-As a native solution, one can always clean the dataset by removing the data item and rerun the whole pipeline.
-With the fine-grained lineage information, we can figure out the propagation of the corrupted data item in the pipeline,
-then remove the affected data items that only depend on the corrupted data item.
+Figure~\ref{fig:mnistrandomfft} shows the MNISTRandomFFT pipeline that classifies hand written digits. 
+The user of this pipeline trains the linear model by feeding the prepared datasets (results of VectorCombiner) to the Linear Solver.
+After deploying the trained model, the user finds a corrupted data item in the training dataset and he wants to replace the erroneous model
+with the correct model. 
+As a straightforward solution, he can clean the dataset by removing the corrupted data item and rerun the whole pipeline.
+
+While the fine-grained data lineage information provides an opportunity to avoid repeating the whole pipeline.
 Specifically for this use case, we chain the lineage information from the beginning of the pipeline till VectorCombiner.
 With forward query and backward query, we confirm that the corrupted data item, a 784 dimensional vector, only affects
 a 2048 dimensional vector as the output of VectorCombiner, and vice versa. So instead of rerunning the whole pipeline, 
-we can filter the output of VectorCombiner to remove the corresponding vector, and feed the cleaned dataset to the linear solver.
+we can filter the output of VectorCombiner to remove the corresponding vector, and feed the filtered dataset to the linear solver.
 In this way, debugging latency is reduced by skipping the repeated computation in the pipeline.
 
 \begin{figure}[ht]
@@ -304,29 +290,27 @@ Typical machine learning workflows are constructed via an iterative proces of re
 These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
 Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
 
-Figure~\ref{fig:vocsiftfisher} shows the VOCSIFTFisher pipeline. The pipeline processes the VOC dataset and classifies each image into a particular category.
-This pipeline uses Principal Component Analysis (PCA) and a gaussian Mixture Model (GMM) to build visual vocabularies for image classification.
+
 \begin{figure}[ht]
 \begin{center}
     \includegraphics[width=85mm]{pictures/VOCSIFTFisher}
-    \caption {The VOCSIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators, shaded boxes are calling out to C library for computation.
+    \caption {The SIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators, shaded boxes are calling out to C library for computation.
     \label{fig:vocsiftfisher}
 }
 \end{center}
 \end{figure}
 
-As a concrete example, consider the SIFT/Fisher Vector pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
-It has been shown that augmenting traditional SIFT descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
+As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
+It has been shown that augmenting traditional SIFT (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
 However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
-By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM, and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
-By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory.
+By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
+By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
 
 
 \subsubsection{Results Debugging}
-Figure~\ref{fig:sourceextractor} is the SourceExtractor pipeline. 
-It processes images from the astronomical telescope, such as Sloan Digital Sky Survey (SDSS).
-The pipeline produces an object catalog for each input image as the result. 
-The object catalog include the object position, the object shape, and statistics of the object.
+The SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor}, processes images from the 
+astronomical telescopes and produces astroid catalogs. 
+The object catalog include the position, shape, and other statistical properties of the object.
 
 \begin{figure}[h]
 \begin{center}
@@ -337,18 +321,11 @@ The object catalog include the object position, the object shape, and statistics
 \end{center}
 \end{figure}
 
-Users of the SourceExtractor pipeline have the images as inputs and the object catalogs as outputs.
-A typical analysis involves the comparison between the output catalogs and the existing catalogs from previous surveys or observations.
-Given an object in the output catalogs that was not recorded before, the astronomer may look into the image finding out the
-position of the object.
-With the same procedure, astronomers can also find objects that are abnormally bright and find the related pixels in the image.
-These pixels may be a result of cosmic ray effect or a bad pixel in the camera. 
-In either case, these pixels need to be removed and the corresponding objects should be removed from the catalog.
-
-In the first case, the astronomer runs a backward query throughout the pipeline with an object as key. 
-The returned pixels can then be visualized with highlights.
-While in the second case, the astronomer first runs a backward query throughout the pipeline to find the bad pixels. 
-Then a forward query is need to find out the propagation of the bad pixel, and remove the affected objects.
+One use case is for astronomers to find out the bright objects over a threshold and validate that these objects are indeed astroids rather
+than noise caused by cosmic rays.
+With the lineage information, astronomers can first filter the results to find the objects whose brightness is above a threshold.
+Then using backward query, they can find corresponding pixels for these bright objects. 
+Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
 
 \section{Lineage}
 \label{sec:Lin}
