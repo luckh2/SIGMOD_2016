@@ -78,7 +78,7 @@
 
 \begin{document}
 
-\title{Gineala: Debugging Machine Learning Pipelines with Fine-grained Lineage}
+\title{Gineala: Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
 
 \numberofauthors{3} 
 \author{
@@ -86,7 +86,7 @@
 \alignauthor Zhao~Zhang\\\
        \affaddr{AMPLab}\\
        \affaddr{University of California, Berkeley} \\
-       \email{zhangzhao@berkeley.edu}    
+       \email{zhaozhang@cs.berkeley.edu}    
 % 4th. author       
 \alignauthor Evan~R.~Sparks\\\
        \affaddr{AMPLab}\\
@@ -103,11 +103,10 @@
 
 \begin{abstract}
 Distributed machine learning (ML) frameworks are increasingly popular as practitioners and researchers 
-can quickly build productive applications (ML pipelines) and execute them at scale. 
-Debugging such a pipeline is often cumbersome due to the lack of system support for
+can build productive applications (ML pipelines) and execute them at scale. 
+Diagnosing such a pipeline is often cumbersome due to the lack of system support for
 recording intermediate state and user interaction.
-In this paper, we explore the debuggability issue of distributed ML systems by leveraging fine-grained 
-data lineage throughout ML pipelines. 
+In this paper, we explore the diagnosability of distributed ML systems by leveraging fine-grained data lineage. 
 Specifically, we formulate the fine-grained data lineage as mappings between multi-dimensional spaces,
 identify a suite of primitive lineage types based on its mapping patterns, 
 and investigate several recording and indexing strategies to reduce the storage consumption and improve the query performance.
@@ -118,9 +117,10 @@ Gineala exposes an API derived from \emph{primitive lineage types} and collects 
 data transformation by recording the input datasets, the output datasets and the mapping between them along
 with all information needed to reproduce the computation - including program logic, model parameters, and random seed values.
 Gineala efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
-Practically, the Gineala can reduce the storage consumption by up to 45x and speeds up the query performance
-by up to 31x. The performance penalty introduce by Gineala is 16\%-54\% depending on the pipeline and
-use case.
+For a single transformer, Gineala's high-order function mapping strategy can reduce the storage consumption by up to 
+45x comparing to the element-wise mapping recording.
+Using the RTree spatial index, Gineala speeds up the query performance by up to 2x-31x comparing to that without index. 
+The performance penalty introduced by Gineala is 16\%-54\% depending on the pipeline and use case.
 
 \end{abstract}
 
@@ -137,43 +137,53 @@ Among these systems, Scikit-learn~\cite{pedregosa2011scikit} and TensorFlow~\cit
 are single-computer-based framework while Apache Mahout~\cite{owen2011mahout}, MLlib~\cite{meng2015mllib}, 
 SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
 
-Debugging such an ML pipeline with datasets in a distributed environment can be problematic due to
+Users often need to try a number of options (e.g. featurization, training parameters, and datasets) before
+deriving a working model. 
+A diagnostic tool that allows quick inspection of the mapping between input and output at the element granularity 
+will illustrate computation insights for users to trace suspicious anomalies, locate bugs in the ML pipeline, and
+replay the partial ML pipeline of interest.
+Such a diagnostic tool can speedup users' decision making process when dealing with numerous options.
+
+Diagnosing such an ML pipeline with datasets in a distributed environment can be problematic due to
 the lack of system support of memory states capturing and user interaction.
-To motivate, we present three typical use cases for ML pipeline debugging:
+To motivate, we present three typical use cases for ML pipeline diagnostics:
 \begin{shortlist}
-\item{\bf Data Debugging}: In a hand-written digit classification pipeline, a user wants to remove one
-corrupted training data item and retrain the model.
-\item{\bf Code Debugging}: In an image classification pipeline, a user wants to verify the correctness of 
+\item{\bf Code Vaildation}: In an image classification pipeline, a user wants to verify the correctness of 
 the positional information of features. 
-\item{\bf Results Debugging}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
+\item{\bf Results Inspection}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
 brightness are above a threshold then locate them in the input images.
+\item{\bf Data Cleaning}: In an image classification pipeline, a user observes a particular category has
+a low prediction accuracy, so he wants to remove the training samples of this category and retrain
+the model.
 \end{shortlist}
 
 In practice, users instrument the steps of interest to gather intermediate state and store it in persistent storage
 for later examination. Users may try multiple solutions until this state contains sufficient information to support the
 use case. These solutions are often use case specific, performance degradation prone, and can complicate code
 management due to the demand for multiple versions of a pipeline.
-\evannotes{Given that this is a repeated pattern taken on by users of the system, it is natural to add fully automated support that is transparent to users in terms of performance and application complexity..}
+Given that this is a repeated pattern taken on by users of the system, it is natural to add fully automated support 
+that is transparent to users in terms of performance and application complexity.
 
 On the other hand, fine-grained data lineage at data structure cell-level (e.g. elements of a matrix) -- the mapping between
 input elements to output elements and according computation -- can provide useful information for
-debugging~\cite{widom04}. The user of the {\bf Data Debugging} case can trace the propagation of the corrupted training
-data item from the beginning step forward until the step before model training to figure out the affected features.
-Then the user traces the affected features backward and confirms these affected features only depend on the corrupted
-data item. At this point, the users can remove the affected features directly from the input of the model training step, 
-and rerun the training process with the cleaned dataset. The user of the {\bf Code Debugging} case can trace the lineage
+debugging~\cite{widom04}. The user of the {\bf Code Validation} case can trace the lineage
 information of the feature extraction step backward to figure out the correlated input pixels in the image. Visualizing
-these pixels can help the user confirm the correctness of feature extraction immediately. The astronomer of the {\bf Results Debugging}
+these pixels can help the user confirm the correctness of feature extraction immediately. 
+The astronomer of the {\bf Results Inspection}
 case can first filter the results and find these objects that are above the brightness threshold, then query the lineage
 backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
 if it is an object or an false detection introduced by cosmic ray. 
+The user of the {\bf Data Cleaning} case can trace the propagation of the images through the pipeline right before
+the featurized dataset is fed into training. He then can remove the corresponding data items that are derived from
+the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
 
-
-We seek to enable the debuggability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
+We seek to enable the diagnosability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
 However, building such a lineage system is challenging because: 
 the interface of the lineage system needs to be concise;
 capturing fine-grained data lineage introduces performance penalty;
 lineage querying needs to be responsive.
+One second latency is about the limit that keeps users' thought flow and 10~s 
+while ten seconds is considered as the boundary to loose user' attention~\cite{nielsen2009}.
 
 For a concise lineage system interface, we identify six primitive lineage types by formulating the cell-level mapping 
 of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
@@ -228,12 +238,12 @@ Users have the flexibility to specify either to reconstruct a single transformer
 
 By examining the KeystoneML code base, we see that Gineala's lineage interface covers 87\% (39 out of 45) of the existing transformers.
 Combining the high-order function approach and spatial indexing strategies, 
-the geometry lineage query runs 2x-31x \evannote{do you just want so say ``up to 31x'' in the intro} faster and storage consumption is reduced from $O(kN^2)$
-to $O(k)$, assuming k is the number of mappings, N is the number of input and output elements in each geometry. 
-Our measurements with the three representative ML pipelines show that Gineala lineage capturing scales no worse than the
-ML pipelines.
+the geometry lineage query runs 2x-31x faster than that without index.
+Storage consumption is reduced by up to 45x comparing to the element-wise mapping recording. 
+Our measurements with the three representative ML pipelines show that Gineala lineage 
+capturing scales no worse than the ML pipelines.
 The performance penalty for the three fore-mentioned use cases ranges from 16\% to 54\%.
-The query for these use cases takes from 0.1~s to 1.8~s. \evannote{Is this low enough that you can claim interactive response times on lineage queries?}
+The query for these use cases takes from 0.1~s to 1.8~s. 
 
 In summary, we make the following contributions:
 \begin{shortlist}
@@ -241,17 +251,9 @@ In summary, we make the following contributions:
 \item{} We present a high-order function to describe the geometry to reduce storage overhead.
 \item{} We present and evaluate various spatial indexing strategy to improve the query performance.
 \item{} We present the lower and upper bound of the amount of data that needs to be collected to enable complete pipeline lineage.
-\item{} We present three real uses case of using fine-grained data lineage for data, code, and results debugging, respectively.
+\item{} We present three real uses case of using fine-grained data lineage for code validation, results inspection, and data cleaning, respectively.
 \end{shortlist}
 
-%The rest of the paper is organized as following: 
-%\S\ref{sec:Background} introduces the background of KeystoneML and typical uses of fine-grained lineage systems. 
-%\S\ref{sec:Lin} discusses lineage of a machine learning pipeline formally.
-%\S\ref{sec:Design} discusses the general design of Gineala.
-%\S\ref{sec:Impl} documents the Gineala implementation on KeystoneML with technical details
-%We present the performance measurements in \S\ref{sec:Perf}.
-%\S\ref{sec:Related} surveys existing lineage systems.
-%We conclude and envision future work in \S\ref{sec:Conclusion}.
 
 \section{Background}
 \label{sec:Background}
@@ -261,32 +263,9 @@ In this section, we briefly review the KeystoneML and introduces three use cases
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--Transformers, which perform deterministic data transformation, and Estimators, which ``learn'' Transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
-We select three use cases from real ML pipelines, these three cases are representative for data debugging, code debugging, and results debugging, respectively.
+We select three use cases from real ML pipelines, these three cases are representative for code validation, results inspection, and data cleaning, respectively.
 
-\subsubsection{Data Debugging}
-Figure~\ref{fig:mnistrandomfft} shows the MNISTRandomFFT pipeline that classifies hand written digits. 
-The user of this pipeline trains the linear model by feeding the prepared datasets (results of VectorCombiner) to the Linear Solver.
-After deploying the trained model, the user finds a corrupted data item in the training dataset and he wants to replace the erroneous model
-with the correct model. 
-As a straightforward solution, he can clean the dataset by removing the corrupted data item and rerun the whole pipeline.
-
-While the fine-grained data lineage information provides an opportunity to avoid repeating the whole pipeline.
-Specifically for this use case, we chain the lineage information from the beginning of the pipeline till VectorCombiner.
-With forward query and backward query, we confirm that the corrupted data item, a 784 dimensional vector, only affects
-a 2048 dimensional vector as the output of VectorCombiner, and vice versa. So instead of rerunning the whole pipeline, 
-we can filter the output of VectorCombiner to remove the corresponding vector, and feed the filtered dataset to the linear solver.
-In this way, debugging latency is reduced by skipping the repeated computation in the pipeline.
-
-\begin{figure}[ht]
-\begin{center}
-    \includegraphics[width=85mm]{pictures/MNISTRandomFFT}
-    \caption {The MNISTRandomFFT pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
-    \label{fig:mnistrandomfft}
-}
-\end{center}
-\end{figure}
-
-\subsubsection{Code Debugging}
+\subsubsection{Code Validation}
 Another use of pipeline lineage information goes beyond understanding a single pipeline in isolation.
 In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
 Typical machine learning workflows are constructed via an iterative proces of refinement with a machine learning developer or data scientist in the loop.
@@ -310,7 +289,7 @@ By employing lineage based debugging, we could isolate exactly where in the pipe
 By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
 
 
-\subsubsection{Results Debugging}
+\subsubsection{Results Inspection}
 Users of ML pipelines often interpret the results, identify some potential data anomalies, then retrospect the supporting input data for better understanding.
 Fine-grained data lineage of ML pipelines have sufficient information for such investigation.
 
@@ -331,6 +310,9 @@ than noise caused by cosmic rays.
 With the lineage information, astronomers can first filter the results to find the objects whose brightness is above a threshold.
 Then using backward query, they can find corresponding pixels for these bright objects. 
 Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
+
+\subsubsection{Data Cleaning}
+text
 
 \section{Lineage}
 \label{sec:Lin}
