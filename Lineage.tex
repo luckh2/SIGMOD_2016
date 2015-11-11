@@ -117,7 +117,7 @@ data transformation by recording the input datasets, the output datasets and the
 with the computation, the model and random factors.
 Gineala efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
 Practically, the Gineala can reduce the storage consumption by up to 45x and speeds up the query performance
-by up to 31x. The performance penalty introduce by Gineala is 16\%-41\% depending on the pipeline and
+by up to 31x. The performance penalty introduce by Gineala is 16\%-54\% depending on the pipeline and
 use case.
 
 \end{abstract}
@@ -229,10 +229,10 @@ the geometry lineage query runs 2x-31x faster and storage consumption is reduced
 to $O(k)$, assuming k is the number of mappings, N is the number of input and output elements in each geometry. 
 Our measurements with the three representative ML pipelines show that Gineala lineage capturing scales no worse than the
 ML pipelines.
-The performance penalty for the three fore-mentioned use cases ranges from 16\% to 41\%.
+The performance penalty for the three fore-mentioned use cases ranges from 16\% to 54\%.
 The query for these use cases takes from 0.1~s to 1.8~s.
 
-In summary, we make the following contributions in this work:
+In summary, we make the following contributions:
 \begin{shortlist}
 \item{} We present a concise and powerful lineage system interface by formulating the cell-wise mapping in ML pipelines as multi-dimensional space transformation.
 \item{} We present a high-order function to describe the geometry to reduce storage overhead.
