@@ -51,8 +51,8 @@
 \usepackage{multirow}
 \usepackage{listings}
 \usepackage{url}
-
-\lstset{language=java, numbers=left, numberstyle=\tiny\color{black}, numbersep=3pt, escapeinside={\$}, basicstyle=\footnotesize\ttfamily, escapeinside={\%*}{*)}}
+\usepackage{listings}
+\lstset{language=sql, escapeinside={\$}, basicstyle=\footnotesize\ttfamily, mathescape, escapeinside={\%*}{*)}}
 
 \newif\ifdraft
 \drafttrue
@@ -80,23 +80,12 @@
 
 \title{Gineala: Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
 
-\numberofauthors{3} 
+\numberofauthors{1} 
 \author{
 % 1st. author
-\alignauthor Zhao~Zhang\\\
-       \affaddr{AMPLab}\\
-       \affaddr{University of California, Berkeley} \\
-       \email{zhaozhang@cs.berkeley.edu}    
-% 4th. author       
-\alignauthor Evan~R.~Sparks\\\
-       \affaddr{AMPLab}\\
-       \affaddr{University of California, Berkeley}\\
-       \email{sparks@cs.berkeley.edu}       
-% 6th. author
-\alignauthor Michael~J.~Franklin\\
-       \affaddr{AMPLab}\\
-       \affaddr{University of California, Berkeley}\\
-       \email{franklin@berkeley.edu}   
+\alignauthor Zhao~Zhang, Evan~R.~Sparks, Michael~J.~Franklin \\\
+       \affaddr{AMPLab, University of California, Berkeley}\\
+       \email{\{zhaozhang, sparks, franklin\}@cs.berkeley.edu} 
 }
 
 \maketitle
@@ -138,7 +127,7 @@ are single-computer-based framework while Apache Mahout~\cite{owen2011mahout}, M
 SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
 
 Users often need to try a number of options (e.g. featurization, training parameters, and datasets) before
-deriving a working model. 
+obtaining a working model. 
 A diagnostic tool that allows quick inspection of the mapping between input and output at the element granularity 
 will illustrate computation insights for users to trace suspicious anomalies, locate bugs in the ML pipeline, and
 replay the partial ML pipeline of interest.
@@ -178,19 +167,17 @@ the featurized dataset is fed into training. He then can remove the correspondin
 the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
 
 We seek to enable the diagnosability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
-However, building such a lineage system is challenging because: 
-the interface of the lineage system needs to be concise;
-capturing fine-grained data lineage introduces performance penalty;
-lineage querying needs to be responsive.
-One second latency is about the limit that keeps users' thought flow and 10~s 
-while ten seconds is considered as the boundary to loose user' attention~\cite{nielsen2009}.
+The diagnostic system should be able to collect lineage information of ML pipelines with a minimal performance penalty and
+answer sophisticated lineage query responsively within 10~s~\cite{nielsen2009}.
 
-For a concise lineage system interface, we identify six primitive lineage types by formulating the cell-level mapping 
+
+For a concise lineage system interface, we identify seven primitive lineage types by formulating the cell-level mapping 
 of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
 Higher-dimensional space can collapse/expand to lower-dimensional space along one dimension at a time, 
 resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
 The mapping between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
-{\bf geometry} mapping(\textcircled{2}, \textcircled{4}), and {\bf linear-combination} mapping(\textcircled{3}, \textcircled{8}).
+{\bf geometry} mapping(\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping(\textcircled{3}, \textcircled{8}),
+and {\bf join} mapping.
 A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 Users can declare the according lineage type for individual data transformations.
 For the transformations that are not covered by these primitive types, users can pass in a function that describes the
@@ -228,11 +215,14 @@ Gineala is integrated with the KeystoneML~\cite{sparks15} distributed machine le
 KeystoneML exposes two building blocks: transformers and estimators. 
 A transformer applies a deterministic unary function to data items and produce new data items.
 An estimator takes a collection of data items, and feed them to a training procedure,  and produces a transformer.
-Gineala interacts with KeystoneML at the Transformer level, where the users can declare the lineage type and instrumentation.
-Gineala collects five types of data for each Transformer: the input dataset, the output dataset, the mapping between them
+Gineala interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
+Gineala collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
 along with the computation and the optional model.
 Gineala stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
 of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
+Different from Spark lineage, which tracks partition level data dependency and associated computation for internal system resilience.
+Gineala tracks lineage with a finer granularity at the element level of data structures.
+Besides, Gineala exposes interface for users to specify lineage types and query.
 Upon query, Gineala can load the lineage information from storage and reconstruct the lineage chain.
 Users have the flexibility to specify either to reconstruct a single transformer lineage, a partial chain, or the whole chain.
 
@@ -250,8 +240,7 @@ In summary, we make the following contributions:
 \item{} We present a concise and powerful lineage system interface by formulating the cell-wise mapping in ML pipelines as multi-dimensional space transformation.
 \item{} We present a high-order function to describe the geometry to reduce storage overhead.
 \item{} We present and evaluate various spatial indexing strategy to improve the query performance.
-\item{} We present the lower and upper bound of the amount of data that needs to be collected to enable complete pipeline lineage.
-\item{} We present three real uses case of using fine-grained data lineage for code validation, results inspection, and data cleaning, respectively.
+\item{} We present three real use cases of using fine-grained data lineage for code validation, results inspection, and data cleaning, respectively.
 \end{shortlist}
 
 
@@ -260,13 +249,12 @@ In summary, we make the following contributions:
 In this section, we briefly review the KeystoneML and introduces three use cases of Gineala.
 
 \subsection{KeystoneML}
-KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--Transformers, which perform deterministic data transformation, and Estimators, which ``learn'' Transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
+KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
 We select three use cases from real ML pipelines, these three cases are representative for code validation, results inspection, and data cleaning, respectively.
 
 \subsubsection{Code Validation}
-Another use of pipeline lineage information goes beyond understanding a single pipeline in isolation.
 In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
 Typical machine learning workflows are constructed via an iterative proces of refinement with a machine learning developer or data scientist in the loop.
 These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
@@ -312,23 +300,32 @@ Then using backward query, they can find corresponding pixels for these bright o
 Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
 
 \subsubsection{Data Cleaning}
-text
+Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
+A user of the SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, wants to investigate the impact of removing the images
+of the people category.
+Without lineage information, he has to remove the images of people category from the training set and reruns data
+preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
+With lineage information, the user can intercept the pipeline by loading the output of RowNormalizer directly into KeystoneML,
+filter out the data items that are derived from the people category , and apply the filtered dataset directly to the linear solver.
+In this case, the rerunning process can bypass the expensive data preparation procedure resulting in shorter turn-around time.
 
-\section{Lineage}
-\label{sec:Lin}
-In this section, we formally define the notion of ML pipeline, dataset, lineage and its associated operations of query and replay.
+\section{Mapping}
+\label{sec:Mapping}
+In this section, we formally define the notion of ML pipeline, dataset, mapping and its associated operations of query in the context of 
+relational database.
 
 \subsection{Pipeline and Datasets}
-\label{sec:Lin-Pipe-Data}
+\label{sec:Map-Pipe-Data}
 We define a dataset $I$ as a collection of structured data. In the scope of this work, the supported structures are: 
 string, vector, matrix, and image. A vector or a string is a one dimensional data structure and a matrix is two dimensional. 
 For simplicity, we view string as a vector.
 An image is a three dimensional data structure that is defined by the height, the width and the number
-of channels. Putting these data structures in a collection, e.g. a RDD or a sequence, introduces one additional dimension.
+of channels. 
 
-An element $e \in I$ has two properties: value $e.value$ and coordinates $e.coor$. 
-Combining the additional dimension in the collection with the data structure, 
-the coordinates of an element is a pair of integers, a triple of integers, or a quadruple of integers
+An element $e \in I$ has two properties: value $e.value$ and coordinate $e.coor$ (referred as metadata or meta
+in the following discussion). 
+Combining the additional dimension in the collection (RDD or sequence) with the data structure, 
+the metada of an element is a pair of integers, a triple of integers, or a quadruple of integers
 for vector, matrix, and image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
@@ -336,69 +333,174 @@ Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{i+1}
 $I_{i+1} = T_i(I_i)$. 
 Especially, we denote the output of the whole pipeline as $O = I_{n+1}$
 
-\subsection{Dataset Companion}
-Since transformers operate at the data structure (vector, matrix, image) level, we use the notation
-$\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such that $\forall a \in \overline{I_i(e)}$,
-\[ a.value =
-  \begin{cases}
-    e.value       & \quad \text{if } a.coor = e.coor\\
-    NaN  & \quad \text{otherwise}. \\
-  \end{cases}
-\]
+To simplify the discussion, we use the vector data structure as example in the following discussion.
+Other data structures can be defined in a similar way. 
+For queries, we present the definition of forward query and backward query can be inducted by reversing
+the table order in the join operation.
 
-Accordingly, given a list of distinct elements $(e_1, ..., e_m)$, the companion of $I_i$ with respect to $(e_1, ..., e_m)$ is
-described as: $\forall a \in \overline{I_i(e_1, ..., e_m)}$, 
-\[ a.value =
-  \begin{cases}
-    e.value       & \quad \text{if } \exists e \in (e_1,...,e_m), a.coor = e.coor\\
-    NaN  & \quad \text{otherwise}. \\
-  \end{cases}
-\]
+\subsection{Dataset and Mapping}
+Conceptually, the input dataset and output dataset can be defined
+as tables with each element's position in the data structure as key.
+\newline\newline
+\noindent\begin{minipage}{\textwidth}
+\noindent\begin{minipage}{.2\textwidth}
+\begin{verbatim}
+CREATE TABLE input
+(
+  Meta (INT, INT),
+  Value (DOUBLE)
+);
+\end{verbatim}
+\end{minipage} 
+\qquad{\color{black}\vrule}\qquad
+\begin{minipage}{.2\textwidth}
+\begin{verbatim}
+CREATE TABLE output
+(
+  Meta (INT, INT),
+  Value (DOUBLE)
+)
+\end{verbatim}
+\end{minipage}
+\end{minipage}
+\vspace{2ex}
+
+The mapping between the input and output dataset is a left outer join of the the two tables with a mapping function.
+The Fun function returns the corresponding output elements given an input element. 
+It is a left outer join since an input element may not be corresponding to any output element.
+\begin{lstlisting}
+SELECT *
+From input
+LEFT OUTER JOIN output 
+    ON Fun(in.meta) $\ni$ out.meta
+\end{lstlisting}
+
+In practice, we separate the metadata from the actual element values and only record metadata mapping.
+\begin{lstlisting}
+INSERT INTO mapping (in_meta, out_meta)
+SELECT in.meta, out.meta
+From input
+LEFT OUTER JOIN output 
+    ON Fun(in.meta) $\ni$ out.meta
+\end{lstlisting}
+The retrieval of actual element values can be obtained by joining the mapping table and the output dataset table.
+\begin{lstlisting}
+SELECT mapping.meta, out.value
+From mapping
+LEFT OUTER JOIN output 
+    ON mapping.out_meta = output.meta
+\end{lstlisting}
+
+The input and output mapping of a pipeline is in turn a sequence of mappings of individual transformer.
+Consider a pipeline $P=(T_1, T_2, ..., T_n)$, we denote $mapping_i$ as the mapping for transformer $T_i$.
+The mapping of the pipeline is a sequence of left outer join operations of $\{mapping_1, ..., mapping_n\}$ on 
+$mapping_i.out\_meta = mapping_{i+1}.in\_meta$.
+
+\subsection{Mapping Query}
+A forward query with a key over the mapping of a transformer or a pipeline can be expressed as:
+\begin{lstlisting}
+SELECT out_meta
+FROM mapping
+WHERE key = in_meta
+\end{lstlisting}
+
+A forward query with a list of $keys={k_1, k_2, ..., k_n}$ can be expressed as:
+\begin{lstlisting}
+SELECT out_meta
+FROM mapping
+WHERE $k_1$ = in_meta OR ... OR $k_n$=in_meta
+\end{lstlisting}
+
+\subsection{Mapping Function}
+\label{sec:Map-Func}
+The mapping function {\bf Func} contains the core information of the input and output element dependency.
+Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-dimensional vectors in the case
+of every output element depends on every input element. 
+To eliminate this space burst, we identify seven primitive mapping functions.
+From higher dimension space to lower dimension space, the mapping can be {\bf collapse} or {\bf expansion}.
+Between the equal dimension spaces, the mapping can be {\bf identity}, {\bf all}, {\bf geometry}, {\bf lincom}, and {\bf join}.
+Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with the mapping highlighted with color scheme.
+
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/narrowmapping}
+\caption {Seven primitive mapping functions.
+    \label{fig:narrowmapping}
+}
+\end{center}
+\end{figure}
 
 
-\subsection{Data Lineage and Replay}
-Before defining the lineage, we need to introduce the relationship between the two data structures $A$ and $B$ with the same type.
-We say $A \subseteq B \text{ or } B \supseteq A$, $\text{if }\forall a \in A, \exists b \in B, s.t.\text{ } a \neq NaN \land a.coor = b.coor \land a.value = b.value$.
-By saying $A = B$, we mean $A \subseteq B$ and $B \subseteq A$.
+{\bf Collapse} mapping describes the mapping of a space collapsing into a one dimension lower space along one dimension which needs
+to be specified by the user. Examples include gray scaling a multiple channel image.
+{\bf Expansion} mapping is where a space expands to a one dimension lower space, e.g. expanding a matrix to a vector with column major.
+In {\bf Identity} mapping, each output element only depends on one element with the same coordinate in the input matrix.
+In {\bf All} mapping, each output element depends on all elements in the input matrix.
+{\bf Geometry} mapping describes the case where a group of output elements depend on a group of input elements.
+{\bf LinCom} mapping describes the data dependencies in a linear model.
+{\bf Join} mapping happens between equal dimension space transformation, where nested collection of data structure is reorganized by 
+transposing two dimensions
+For the mappings that are not covered by the primitive functions, we allow users to define their own mapping functions.
 
-We define the data lineage of a given element as the elements in the input dataset that is used to produce present element.
-The single transformer lineage is
-\begin{equation}
-S(e \in I_{i+1}) = \{e_1, ..., e_m | T_i(\overline{I_i(e_1, ..., e_m)}) \supseteq \overline{I_{i+1}(e)}\}.
-\label{equa:SingleLineage}
-\end{equation}
+%Since transformers operate at the data structure (vector, matrix, image) level, we use the notation
+%$\overline{I_i(e)}$ as the companion of $I_i$ with respect to element $e$ such that $\forall a \in \overline{I_i(e)}$,
+%\[ a.value =
+%  \begin{cases}
+%    e.value       & \quad \text{if } a.coor = e.coor\\
+%    NaN  & \quad \text{otherwise}. \\
+%  \end{cases}
+%\]
 
+%Accordingly, given a list of distinct elements $(e_1, ..., e_m)$, the companion of $I_i$ with respect to $(e_1, ..., e_m)$ is
+%described as: $\forall a \in \overline{I_i(e_1, ..., e_m)}$, 
+%\[ a.value =
+%  \begin{cases}
+%    e.value       & \quad \text{if } \exists e \in (e_1,...,e_m), a.coor = e.coor\\
+%    NaN  & \quad \text{otherwise}. \\
+%  \end{cases}
+%\]
 
-Recursively, the lineage of a given element across multiple transformers can be defined as
-\begin{equation}
-L(e) = \cup_{e' \in S(e)} L(e').
-\end{equation}
-
-We define the property 
-\begin{equation}
-Replay(e \in I_{i+1}) = \overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})
-\end{equation}
-as the replay property, which means we can reproduce an output element $e$ by applying the corresponding transformer to its data lineage.
-The constraint of the replay property is that only the element $e$ is guaranteed to be the same as the original transformation,
-if $\overline{I_{i+1}(e)} \subset T_i(\overline{I_i(e_1, ..., e_m)})$. 
-In this case, the results of the replayed transformer may produce inconsistent results for elements other than $e$ in $I_{i+1}$. 
-Similarly, the replay property for multiple elements only guarantees the correctness of these elements themselves.
-
-\subsection{Data Lineage Query}
-The forward query of an element over data lineage of a pipeline $P$ returns $qForward(e) = \{e' | e \in L(e' \in O)\}$. 
-And the backward query of an element over data lineage returns $qBackward(e) = e' \in L(e)$.
-Specifically, the identifier of an element is its coordinates in the according data structure, so the query actually takes
-the coordinates of the input element as key, and query over the data lineage. The query that spans multiple transformers 
-use coordinates as intermediate data. Once the query reaches the final transformer, it can associate the actual values
-with the result element coordinates and return them.
-
-Queries of multiple elements can then be expressed as the union of the query for each element: 
-\begin{equation}
-\begin{split}
-qForward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qForward(e) \\
-qBackward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qBackward(e).
-\end{split}
-\end{equation}
+%Before defining the lineage, we need to introduce the relationship between the two data structures $A$ and $B$ with the same type.
+%We say $A \subseteq B \text{ or } B \supseteq A$, $\text{if }\forall a \in A, \exists b \in B, s.t.\text{ } a \neq NaN \land a.coor = b.coor \land a.value = b.value$.
+%By saying $A = B$, we mean $A \subseteq B$ and $B \subseteq A$.
+%
+%We define the data lineage of a given element as the elements in the input dataset that is used to produce present element.
+%The single transformer lineage is
+%\begin{equation}
+%S(e \in I_{i+1}) = \{e_1, ..., e_m | T_i(\overline{I_i(e_1, ..., e_m)}) \supseteq \overline{I_{i+1}(e)}\}.
+%\label{equa:SingleLineage}
+%\end{equation}
+%
+%Recursively, the lineage of a given element across multiple transformers can be defined as
+%\begin{equation}
+%L(e) = \cup_{e' \in S(e)} L(e').
+%\end{equation}
+%
+%We define the property 
+%\begin{equation}
+%Replay(e \in I_{i+1}) = \overline{I_{i+1}(e)} \subseteq T_i(\overline{I_i(e_1, ..., e_m)})
+%\end{equation}
+%as the replay property, which means we can reproduce an output element $e$ by applying the corresponding transformer to its data lineage.
+%The constraint of the replay property is that only the element $e$ is guaranteed to be the same as the original transformation,
+%if $\overline{I_{i+1}(e)} \subset T_i(\overline{I_i(e_1, ..., e_m)})$. 
+%In this case, the results of the replayed transformer may produce inconsistent results for elements other than $e$ in $I_{i+1}$. 
+%Similarly, the replay property for multiple elements only guarantees the correctness of these elements themselves.
+%
+%\subsection{Data Lineage Query}
+%The forward query of an element over data lineage of a pipeline $P$ returns $qForward(e) = \{e' | e \in L(e' \in O)\}$. 
+%And the backward query of an element over data lineage returns $qBackward(e) = e' \in L(e)$.
+%Specifically, the identifier of an element is its coordinates in the according data structure, so the query actually takes
+%the coordinates of the input element as key, and query over the data lineage. The query that spans multiple transformers 
+%use coordinates as intermediate data. Once the query reaches the final transformer, it can associate the actual values
+%with the result element coordinates and return them.
+%
+%Queries of multiple elements can then be expressed as the union of the query for each element: 
+%\begin{equation}
+%\begin{split}
+%qForward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qForward(e) \\
+%qBackward(e_1, ..., e_m) = \cup_{e \in (e_1, ..., e_m)} qBackward(e).
+%\end{split}
+%\end{equation}
 
 \section{Requirements}
 \label{sec:Req}
@@ -482,25 +584,7 @@ We observe that many transformations in various pipelines has narrow dependencie
 only depends on one input matrix. Figure~\ref{fig:narrowmapping} shows this case. 
 The left mapping is from an input RDD of matrices to an output RDD of matrices. 
 
-\begin{figure}[h]
-\begin{center}
-    \includegraphics[width=85mm]{pictures/narrowmapping}
-\caption {Left: The narrow mapping cases in the context of Resilient Distributed Dataset (RDD), rectangles are RDDS and rounded-corner rectangles are matrices.
-Right: Four element-wise mapping cases, mappings are shown with color highlights.
-    \label{fig:narrowmapping}
-}
-\end{center}
-\end{figure}
 
-Taking a pair of matrices, we see four types of element-wise mappings: 
-{\bf One Mapping}, in which case each output element only depends on one element with the same coordinate in the input matrix.
-{\bf All Mapping}, in which case each output element depends on all elements in the input matrix.
-{\bf Region Mapping}, in which a group of output elements depend on a group of input elements.
-{\bf Sample Mapping}, in which the output is a sample of the input.
-
-In general, all three data structures, DenseVector, DenseMatrix and Image have these four mapping types. 
-So Gineala defines these four element-wise mapping types, and users can use these mapping types to declare lineage. 
-In the next section, we will introduce how Gineala's lineage interface exposes the lineage declaration interface with the mapping information.
 
 
 \subsection{Region Mapping}
