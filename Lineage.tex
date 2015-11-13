@@ -125,101 +125,41 @@ Given that this is a repeated pattern taken on by users of the system, it is nat
 that is transparent to users in terms of performance and application complexity.
 
 In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained lineage information
-(data structure element level, e.g. elements in a matrix).
-This diagnostic system enables users to specify the lineage of data transformation with a concise interface, collect fine-grained lineage 
-information with a minimal performance penalty, trace the input/output dependency responsively. 
+(data structure cell level, e.g. elements in a matrix). We assume an programming model similar to KeystoneML that builds ML pipelines
+as a chain of data transformations, with each transformation having ML semantics.
+This diagnostic system enables users to specify the lineage of data transformation with a concise interface, customize the instrumentation, 
+collect fine-grained lineage with a minimal performance penalty, and trace the input/output dependency responsively. 
 
-
-%A diagnostic tool that allows easy integration with the ML framework, minimal performance penalty, quick and accurate inspection of the element mapping
-%will illustrate computation insights for users to trace suspicious anomalies, locate bugs in the ML pipeline, and tune the ML model. 
-%Fine-grained data lineage at data structure element-level (e.g. elements of a matrix) -- the mapping between
-%input elements to output elements and according computation -- can provide useful information for
-%such diagnosis~\cite{widom04}. 
-%We seek to enable the diagnosability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
-%The diagnostic system should be easy to use, able to collect lineage information of ML pipelines with a minimal performance penalty, and
 %answer sophisticated lineage query responsively( with query latency lower than 10~seconds~\cite{nielsen2009}).
 Lineage tracking has been investigated in various areas.
-Existing lineage tracking system such as xx and and xx focus on coarse-grained lineage of metadata.
-The weak inversion method~\cite{woodruff97} sacrifices lineage accuracy assuming the queries can tolerate errors.
-Trio~\cite{widom04} tracks lineage in the RDBMS context with eager materialization of cell mappings.
+Existing lineage tracking system such as xx and and xx focus on coarse-grained lineage of scientific workflow systems.
+The weak inversion method~\cite{woodruff97} for RDBMS was proposed for queries that can tolerate inaccurate lineage information.
+Trio~\cite{widom04} tracks lineage for the RDBMS context with eager materialization of cell mappings.
 Recent work in fine-grained lineage capturing such as GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} presents
-solutions on mapreduce systems. Both systems exposes lineage capturing interface at cell level and construct the 
+solutions for mapreduce systems. Both systems expose lineage capturing interface at cell level and construct the 
 lineage based on the order of the key-value pair arrival in an operator. 
 SubZero~\cite{wu13} which is built on SciDB~\cite{brown10} exposes lineage capturing interface at cell level and
 predefines a few high level lineage types, e.g. region lineage.
 
 Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks
-for three reasons.
+for two reasons.
 First, the lineage information collected by systems of xx and the weak inversion method is not sufficient for accurate ML pipeline diagnosis.
-Second, the lineage capturing interface of GMRW, Newt, and SubZero is low level and does not have ML semantics.
-Third, the lineage capturing interface has a limited coverage of ML pipeline lineage types.
+Second, the lineage capturing interface of Trio, GMRW, Newt, and SubZero is designed with a bottom-up approach
+that operates on the underlying system operators (e.g. mapper and combiner in mapreduce systems, UDF in SciDB). 
+This approach is general for all workloads running on the system, but it gives the user very limited flexibility for customized
+instrumentation (specification of lineage type and the data to be collected).
 
-
-
-Machine learning frameworks are increasingly popular as practitioners and researchers can quickly
-build productive applications (referred to as ML pipelines in the rest of this paper) with a high-level 
-programming language to pipeline data preparation, feature extraction, model training, 
-and prediction. 
-Among these systems, Scikit-learn~\cite{pedregosa2011scikit} and TensorFlow~\cite{tensorflow15} \evannote{tensorflow is distributed}
-are single-computer-based framework while Apache Mahout~\cite{owen2011mahout}, MLlib~\cite{meng2015mllib}, 
-SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
-
-Users often need to try a number of options (e.g. featurization, training parameters, and datasets) before
-obtaining a working model. 
-A diagnostic tool that allows quick inspection of the mapping between input and output at the element granularity 
-will illustrate computation insights for users to trace suspicious anomalies, locate bugs in the ML pipeline, and
-replay the partial ML pipeline of interest.
-Such a diagnostic tool can speedup users' decision making process when dealing with numerous options.
-
-Diagnosing such an ML pipeline with datasets in a distributed environment can be problematic due to
-the lack of system support of memory states capturing and user interaction.
-To motivate, we present three typical use cases for ML pipeline diagnostics:
-\begin{shortlist}
-\item{\bf Code Vaildation}: In an image classification pipeline, a user wants to verify the correctness of 
-the positional information of features. 
-\item{\bf Results Inspection}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
-brightness are above a threshold then locate them in the input images.
-\item{\bf Data Cleaning}: In an image classification pipeline, a user observes a particular category has
-a low prediction accuracy, so he wants to remove the training samples of this category and retrain
-the model.
-\end{shortlist}
-
-In practice, users instrument the steps of interest to gather intermediate state and store it in persistent storage
-for later examination. Users may try multiple solutions until this state contains sufficient information to support the
-use case. These solutions are often use case specific, performance degradation prone, and can complicate code
-management due to the demand for multiple versions of a pipeline.
-Given that this is a repeated pattern taken on by users of the system, it is natural to add fully automated support 
-that is transparent to users in terms of performance and application complexity.
-
-On the other hand, fine-grained data lineage at data structure cell-level (e.g. elements of a matrix) -- the mapping between
-input elements to output elements and according computation -- can provide useful information for
-debugging~\cite{widom04}. The user of the {\bf Code Validation} case can trace the lineage
-information of the feature extraction step backward to figure out the correlated input pixels in the image. Visualizing
-these pixels can help the user confirm the correctness of feature extraction immediately. 
-The astronomer of the {\bf Results Inspection}
-case can first filter the results and find these objects that are above the brightness threshold, then query the lineage
-backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
-if it is an object or an false detection introduced by cosmic ray. 
-The user of the {\bf Data Cleaning} case can trace the propagation of the images through the pipeline right before
-the featurized dataset is fed into training. He then can remove the corresponding data items that are derived from
-the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
-
-We seek to enable the diagnosability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
-The diagnostic system should be able to collect lineage information of ML pipelines with a minimal performance penalty and
-answer sophisticated lineage query responsively within 10~s~\cite{nielsen2009}.
-
-
-For a concise lineage system interface, we identify seven primitive lineage types by formulating the cell-level mapping 
-of an ML pipeline as a sequence of multi-dimensional space transformation, as shown in Figure~\ref{fig:conceptual}.
+In this work, we use a top-down approach to design the lineage capturing interface that returns declaration and instrumentation
+flexibility to users. By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
+(Figure~\ref{fig:conceptual} shows an example), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional space along one dimension at a time, 
 resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
 The mapping between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
 {\bf geometry} mapping(\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping(\textcircled{3}, \textcircled{8}),
-and {\bf join} mapping.
+and {\bf join} mapping. 
+This interface covers 87\% of the data transformations in the current code base of KeystoneML. 
+For transformations that are not covered, the lineage capturing interface allows users to specify a customized mapping function.
 A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
-Users can declare the according lineage type for individual data transformations.
-For the transformations that are not covered by these primitive types, users can pass in a function that describes the
-mapping as a parameter of the lineage.
 
 \begin{figure}[h]
 \begin{center}
@@ -238,6 +178,34 @@ mapping as a parameter of the lineage.
 }
 \end{center}
 \end{figure}
+
+Diagnosing such an ML pipeline with datasets in a distributed environment can be problematic due to
+the lack of system support of memory states capturing and user interaction.
+To motivate, we present three typical use cases for ML pipeline diagnostics:
+\begin{shortlist}
+\item{\bf Code Validation}: In an image classification pipeline, a user wants to verify the correctness of 
+the positional information of features. 
+\item{\bf Results Inspection}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
+brightness are above a threshold then locate them in the input images.
+\item{\bf Data Cleaning}: In an image classification pipeline, a user observes a particular category has
+a low prediction accuracy, so he wants to remove the training samples of this category and retrain
+the model.
+\end{shortlist}
+
+
+
+The astronomer of the {\bf Results Inspection}
+case can first filter the results and find these objects that are above the brightness threshold, then query the lineage
+backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
+if it is an object or an false detection introduced by cosmic ray. 
+The user of the {\bf Data Cleaning} case can trace the propagation of the images through the pipeline right before
+the featurized dataset is fed into training. He then can remove the corresponding data items that are derived from
+the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
+
+
+
+
+
 
 The performance penalty introduced by lineage capturing comes mostly from persisting in-memory data to storage.
 In the context of data transformation, there are three potential datasets: the input, the output, and mapping between them.
