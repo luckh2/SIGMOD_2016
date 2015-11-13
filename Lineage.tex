@@ -91,26 +91,16 @@
 \maketitle
 
 \begin{abstract}
-Distributed machine learning (ML) frameworks are increasingly popular as practitioners and researchers 
-can build productive applications (ML pipelines) and execute them at scale. 
-Diagnosing such a pipeline is often cumbersome due to the lack of system support for
-recording intermediate state and user interaction.
-In this paper, we explore the diagnosability of distributed ML systems by leveraging fine-grained data lineage. 
-Specifically, we formulate the fine-grained data lineage as mappings between multi-dimensional spaces,
-identify a suite of primitive lineage types based on its mapping patterns, 
-and investigate several recording and indexing strategies to reduce the storage consumption and improve the query performance.
-
-We present the Gineala lineage system and integrate it with KeystoneML, a distributed machine learning
-application framework built on top of Apache Spark. 
-Gineala exposes an API derived from \emph{primitive lineage types} and collects fine-grained data lineage for each 
+We present the SystemL lineage system to enable the diagnosis of distributed machine learning (ML) pipelines by leveraging the fine-grained
+data lineage.  
+SystemL exposes a concise yet powerful API derived from \emph{primitive lineage types} and collects fine-grained data lineage for each 
 data transformation by recording the input datasets, the output datasets and the mapping between them along
-with all information needed to reproduce the computation - including program logic, model parameters, and random seed values.
-Gineala efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
-For a single transformer, Gineala's high-order function mapping strategy can reduce the storage consumption by up to 
+with all information needed to reproduce the computation.
+SystemL efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
+For a single transformer, SystemL's high-order function mapping strategy can reduce the storage consumption by up to 
 45x comparing to the element-wise mapping recording.
-Using the RTree spatial index, Gineala speeds up the query performance by up to 2x-31x comparing to that without index. 
-The performance penalty introduced by Gineala is 16\%-54\% depending on the pipeline and use case.
-
+Using the spatial index, SystemL speeds up the query performance by up to 2x-31x comparing to that without index. 
+The performance penalty introduced by SystemL is 16\%-54\% depending on the pipeline and use case.
 \end{abstract}
 
 % A category with the (minimum) three required fields
@@ -118,6 +108,54 @@ The performance penalty introduced by Gineala is 16\%-54\% depending on the pipe
 %\keywords{ACM proceedings, \LaTeX, text tagging}
 
 \section{Introduction}
+Machine learning frameworks are increasingly popular as practitioners and researchers can quickly
+build applications (referred to as ML pipelines in the rest of this paper) with a high-level 
+programming language to pipeline data preparation, feature extraction, model training, 
+and prediction. 
+Among these systems, Scikit-learn~\cite{pedregosa2011scikit} and TensorFlow~\cite{tensorflow15} \evannote{tensorflow is distributed}
+are single-computer-based framework while Apache Mahout~\cite{owen2011mahout}, MLlib~\cite{meng2015mllib}, 
+SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
+In practice, to obtain a working model, users often need to try a number of options (e.g. featurization, training parameters, and datasets). 
+When experimenting with these options, users frequently analyze results by combining the corresponding input data,  
+locate the code segment for unexpected outcome, and rerun the computation with the removal of suspicious data anomalies.
+Commonly, they use a case-by-case solution to record necessary information and store them in persistent storage for examination.
+These solutions are often use case specific, performance degradation prone, and can complicate code
+management due to the demand for multiple versions of a pipeline.
+Given that this is a repeated pattern taken on by users of the system, it is natural to add fully automated support 
+that is transparent to users in terms of performance and application complexity.
+
+In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained lineage information
+(data structure element level, e.g. elements in a matrix).
+This diagnostic system enables users to specify the lineage of data transformation with a concise interface, collect fine-grained lineage 
+information with a minimal performance penalty, trace the input/output dependency responsively. 
+
+
+%A diagnostic tool that allows easy integration with the ML framework, minimal performance penalty, quick and accurate inspection of the element mapping
+%will illustrate computation insights for users to trace suspicious anomalies, locate bugs in the ML pipeline, and tune the ML model. 
+%Fine-grained data lineage at data structure element-level (e.g. elements of a matrix) -- the mapping between
+%input elements to output elements and according computation -- can provide useful information for
+%such diagnosis~\cite{widom04}. 
+%We seek to enable the diagnosability of distributed machine learning frameworks by leveraging the fine-grained data lineage.
+%The diagnostic system should be easy to use, able to collect lineage information of ML pipelines with a minimal performance penalty, and
+%answer sophisticated lineage query responsively( with query latency lower than 10~seconds~\cite{nielsen2009}).
+Lineage tracking has been investigated in various areas.
+Existing lineage tracking system such as xx and and xx focus on coarse-grained lineage of metadata.
+The weak inversion method~\cite{woodruf97} sacrifices lineage accuracy assuming the queries can tolerate errors.
+Trio~\cite{widom04} tracks lineage in the RDBMS context with eager materialization of cell mappings.
+Recent work in fine-grained lineage capturing such as GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} presents
+solutions on mapreduce systems. Both systems exposes lineage capturing interface at cell level and construct the 
+lineage based on the order of the key-value pair arrival in an operator. 
+SubZero~\cite{wu13} which is built on SciDB~\cite{brown10} exposes lineage capturing interface at cell level and
+predefines a few high level lineage types, e.g. region lineage.
+
+Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks
+for three reasons.
+First, the lineage information collected by systems of xx and the weak inversion method is not sufficient for accurate ML pipeline diagnosis.
+Second, the lineage capturing interface of GMRW, Newt, and SubZero is low level and does not have ML semantics.
+Third, the lineage capturing interface has a limited coverage of ML pipeline lineage types.
+
+
+
 Machine learning frameworks are increasingly popular as practitioners and researchers can quickly
 build productive applications (referred to as ML pipelines in the rest of this paper) with a high-level 
 programming language to pipeline data preparation, feature extraction, model training, 
@@ -252,6 +290,7 @@ In this section, we briefly review the KeystoneML and introduces three use cases
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
+\label{sec:Back-cases}
 We select three use cases from real ML pipelines, these three cases are representative for code validation, results inspection, and data cleaning, respectively.
 
 \subsubsection{Code Validation}
@@ -863,58 +902,113 @@ In reality, we see that the performance of {\bf RTree} an {\bf KMeans} are signi
 number of boxes in each non-leaf node for {\bf RTree} and the number of iterations for {\bf KMeans}.
 A detailed performance study is present in \S\ref{sec:Perf-Index}.
 
-\begin{table}[ht]
-\begin{center}
-    \caption{Index Strategy Profile on Single SIFTExtracror}
-    \begin{scriptsize}
-    \begin{tabular}{ | p{1.7cm} | p{0.9cm} | p{0.8cm} | p{0.9cm} | p{1cm} | p{1cm} |}
-    \hline
-    Strategy & NoIndex & Direct & RTree & KMeans1 & KMeans5 \\ \hline \hline
-    Average (ms) & 0.28 & 0.04 & 0.095 & 0.073 & 0.049 \\ \hline
-    Stdev & 0.08 & 0.011 & 0.022 & 0.011 & 0.014 \\ \hline
-    Space (MB) & 0.44 & 22.49 & 0.78 & 0.5 & 0.5 \\ \hline
-    \end{tabular}
-    \end{scriptsize}
-    \label{tb:single-SIFT-query}
-\end{center}   
-\end{table}
+%\begin{table}[ht]
+%\begin{center}
+%    \caption{Index Strategy Profile on Single SIFTExtracror}
+%    \begin{scriptsize}
+%    \begin{tabular}{ | p{1.7cm} | p{0.9cm} | p{0.8cm} | p{0.9cm} | p{1cm} | p{1cm} |}
+%    \hline
+%    Strategy & NoIndex & Direct & RTree & KMeans1 & KMeans5 \\ \hline \hline
+%    Average (ms) & 0.28 & 0.04 & 0.095 & 0.073 & 0.049 \\ \hline
+%    Stdev & 0.08 & 0.011 & 0.022 & 0.011 & 0.014 \\ \hline
+%    Space (MB) & 0.44 & 22.49 & 0.78 & 0.5 & 0.5 \\ \hline
+%    \end{tabular}
+%    \end{scriptsize}
+%    \label{tb:single-SIFT-query}
+%\end{center}   
+%\end{table}
 
-\section{Performance Measurements}
+\section{Evaluation}
 \label{sec:Perf}
-Measurements
+In this section, we present the performance measurements of SystemL from various aspects.
+We demonstrate various built-in indexing strategy for geometry mapping, and profile the tradeoff
+between index building time, query performance, memory usage and storage consumption.
+We present the end-to-end performance and memory/disk usage for three real ML pipelins.
+Then we show the profiling of SystemL's scalability with three real ML pipelines on varying cluster sizes.
+Last, we measure the performance of the three use cases presented in \S\ref{sec:Back-cases} with 
+fine-grained lineage and its according cost.
 
-\subsection{Region Index}
+Unless otherwise specified, we run all experiments on Amazon EC2 using r3.8xlarge instances.
+Each machine has 16 physical cores, 244 GB memory, and two 320GB SSD. 
+SystemL is integrated with KeystoneML 0.3 which in turn runs over Spark 1.3.1, HDFS from the
+CDH4 distribution of Hadoop. 
+
+\subsection{Geometry Mapping Index}
 \label{sec:Perf-Index}
+With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:RegionIndex}.
+We use a workload with 5,000 pairs of input and output matrix, with each pair producing 60,000 geometry mappings that are uniformly distributed
+in 2D space. The total number of mappings capture is 300 million. The experiment was executed on a 16 node cluster.
+
+Figure~\ref{fig:sift-time} presents the end-to-end performance of this workload with a detailed runtime decomposition. For each data point, 
+we run it three times and present the average. 
 
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SIFTIndex-Time}
-\caption {Runtime profile of the VOCSIFTFisher pipeline with four indexing strategies for region lineage.
+\caption {Runtime profile of the indexing strategies for geometry mapping over 300 million geometry mappings.
     \label{fig:sift-time}
 }
 \end{center}
 \end{figure}
 
+Without lineage tracking, the workload takes 61.3~seconds to finish without lineage tracking, shown as the baseline.
+Tracking metadata mapping (geometry mapping) incurs a 89.8~seconds overhead in average. 
+Building the index for geometry mapping takes 33.9, 69.9, and 349.0~seconds for RTree, KMeans-1, and KMeans-5.
+The Direct strategy crashes due to insufficient memory.
+
+Figure~\ref{sift-query} presents the query performance with these indexing strategies.
+For each strategy, we run queries with {1, 100, 1000, 10000} batch size.
+NoIndex strategy perform worst among the four strategies, the query latency quickly grow over 10,000~ms with batch size of 100.
+The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with batch size of 1000 and 10000, respectively.
+KMeans-5 runs  31.1\% and 35.2\% faster with batch size of 1000 and 10000, respectively.
+
+
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SIFTQuery-Time}
-\caption {Query performance profile of the SIFTExtractor transformer in VOCSIFTFisher pipeline with four indexing strategies for region lineage in log scale
+\caption {Query performance profile of the geometry mapping with four indexing strategies
     \label{fig:sift-query}
 }
 \end{center}
 \end{figure}
 
+The storage consumption of the four indexing strategies is 30.8GB, 55.4GB, 34.3GB, and 34.3GB 
+for NoIndex, RTree, KMeans-1, KMeans-5, respectively. 
+For RTree strategy, the index takes as much as 83\% of the mapping size. 
+While for RTree, it is 11.4\%.
+These four indexing strategies use 71.4\%, 85.7\%, 85.7\%, and 114.3\% more memory comparing to the
+baseline case that does not track lineage.
+
+To summarize, NoIndex has the lowest query performance and it is not practical for real use.
+KMeans-5 has the best query performance the longest index building time.
+RTree has a balanced query performance and building time with the highest storage consumption.
+Since storage is not the major bottleneck given the machine capability, we use the RTree strategy
+as default, leaving the RTree strategies as users' options.
+
+
+
 \subsection{End-to-end Pipeline Performance}
+We use three ML pipelines to measure the end-to-end performance and its penalty with lineage capturing
+along with resource consumption of memory and storage on a 16 machine cluster.
+For each pipeline, we collect both the metadata mapping, the input dataset of the first transformer,  and the output dataset of all transformers.
+Table~\ref{tb:apps-overhead} presents the measure numbers, for each data point in the table, it is an
+average of three executions. 
+
+We see the performance penalty ranges from 25.6\% to 62.2\%, this performance penalty is comparable to that
+of previous works of GMRW (16$\sim$76\%), Newt (20$\sim$50\%), and SubZero(20\%$\sim$150\%).
+The memory usage overhead comparing to the baseline case is 200\% for MNIST pipeline, however it is using only
+193~GB out of 3.9~TB memory space. 
+For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (1.6~TB), the additional usage is 38.5\% and 43.7\%, respectively.
 
 \begin{table}[ht]
 \begin{center}
-    \caption{Overhead Profile of Gineala on the VOCSIFTFisher, SourceExtractor, and MNIST Pipelines}
+    \caption{Overhead Profile of SystemL on the SIFTFisher, SourceExtractor, and MNIST Pipelines}
     \begin{scriptsize}
-    \begin{tabular}{ | p{1.5cm} | p{2cm} | p{2cm} | p{1.5cm} | }
+    \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | p{1.5cm} | }
     \hline
-    Pipeline & VOCSIFTFisher & SourceExtractor & MNIST  \\ \hline \hline
+    Pipeline & SIFTFisher & SourceExtractor & MNIST  \\ \hline \hline
     Baseline & 780.8s & 279.7s & 56.4s \\ \hline
-    Slowdown & 38.4\% & 25.6\% & 62.2\%   \\ \hline
+    Perf Penalty & 38.4\% & 25.6\% & 62.2\%   \\ \hline
     Memory & 38.5\% & 43.7\% & 200\%\\ \hline
     Meta Space & 109.9~GB & 204.4~MB & 78.9~MB \\ \hline
     Data Space & 615.7~GB & 506.9~GB & 11.8~GB\\ \hline
@@ -925,7 +1019,11 @@ Measurements
 \end{table}
 
 \subsection{Scalability}
-Figure~\ref{fig:scalability}. Scalability shown on 8, 16, 32, 64 nodes.
+We use the same three ML pipelines and execute them on clusters with {8, 16, 32, 64} of machines.
+We measure the performance of the baseline (without lineage), lineage with only metadata mapping, 
+and lineage with both metadata mapping and datasets. 
+Then we decompose the running time for NoLineage, Meta, and Data, and show the relative scalability
+ to the performance of 8 machines, shown as Figure~\ref{fig:scalability}.
 
 \begin{figure}[h]
 \begin{center}
@@ -936,8 +1034,40 @@ Figure~\ref{fig:scalability}. Scalability shown on 8, 16, 32, 64 nodes.
 \end{center}
 \end{figure}
 
+One pattern we can conclude from the scalability measurements is that SystemL scales no worse than the ML pipelines.
+This is due to the fact that SystemL captures and stores the lineage information via the RDD abstraction, which perform
+in a scalable manner. 
+The metadata mapping capturing is more likely to be impacted by the ML pipeline comparing to the case where both metadata
+mapping and datasets are captured, since it is a relatively less data-intensive operations.
+Combining pipeline stats shown in Table~\ref{tb:apps-overhead}, SystemL scales  well when collecting larger datasets.
+In the SIFTFisher case, capturing both metadata mapping and datasets shows scalability that is higher than ideal.
+This is because the SIFTFisher performance is memory-bounded on 8 machines, once the memory bound is relieved, the actual performance
+exceeds the expectation.
+
 \subsection{Use Case}
-Query-oriented instrumentation, collect slowdown, and query performance.
+In the {\bf code validation} case, users instrument the SIFTFisher pipeline by only recording the metadata mapping of the SIFTExtractor transformer.
+Upon validation, users can query extracted feature, and locate the positions of the feature in the input image. With some external visualization tool,
+users can visualize corresponding pixels in the original image. Such an instrumentation introduces a performance penalty of 15.8\% on a 16 machine 
+cluster.
+Query a single feature takes $0.14\pm0.0062$~seconds while a batch query of 1,000 features takes $0.33\pm0.001$~seconds.
+
+In the {\bf results inspection} use case, users of the SourceExtractor pipeline collects the metadata mapping in all transformers along with the output 
+datasets of the last step. By joining the metadata mapping with output datasets, which contains the luminosity information, users can first filter out the
+objects with a threshold brightness. Then query the metadata mapping to find the positions of corresponding pixels in the input images.
+This instrumentation introduces a performance penalty of 40.8\% on a 8 machine cluster. 
+Filtering luminous flux $>300,000$~lumen over 1 million objects returns 10,283 objects
+with its corresponding pixel positions in $1.84\pm0.14$~seconds.
+
+In the {\bf data cleaning} use case, the user of the SIFTFisher pipeline want to remove the training images that has both the human and table as
+he sees such a combination results in lower detection accuracy for the human category .
+So he instruments pipeline collecting all metadata mappings and the output datasets for NormalizeRows transformer. 
+Upon removal, he first joins the output dataset of NormalizeRows (a RDD of vectors) transformer with the labels.
+Then he filters out the corresponding vectors with both human and table in it. 
+From here, he can try retrain the model with the cleaned dataset. 
+This particular instrumentation introduces a performance penalty of 46.8\%, and the removal takes $25.7\pm0.27$ seconds.
+Comparing to the case of rerunning the data preparation phase of the pipeline, using lineage information speeds up the turnaround
+time by 16.4x. Further, to confirm the correctness of the removal, the users can query the lineage backward to find corresponding 
+images and conduct a verification.
 
 \section{Related Work}
 \label{sec:Related}

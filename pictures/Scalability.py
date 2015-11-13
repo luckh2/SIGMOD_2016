@@ -16,7 +16,7 @@ SE = (1, 1.06, 0.81, 0.55)
 SELower = (1, 1.54, 1.45, 1.21)
 SEUpper = (1, 1.97, 3.13, 4.62)
 
-MNIST = (1, 1.08, 1.26, 0.95)
+MNIST = (1, 1.08, 1.05, 0.95)
 MNISTLower = (1, 1.14, 1.15, 1.16)
 MNISTUpper = (1, 1.07, 1.12, 1.12)
 
@@ -31,7 +31,7 @@ ax1.set_xticklabels(xlabels, size='xx-large')
 ax1.set_yticklabels(ylabels, size='xx-large')
 #ax1.legend((line1[0], line2[0], line3[0], line4[0]), ('NoLineage', 'Meta', 'Meta+Data', 'Ideal'), loc='best', prop={'size':20})
 ax1.grid(True)
-ax1.set_title('VOCSIFTFisher', size='xx-large', y=1.2)
+ax1.set_title('SIFTFisher', size='xx-large', y=1.2)
 ax1.set_ylabel('Speedup over 8 nodes (x)', size='xx-large')
 
 ax2.set_xlim(8, 64)
