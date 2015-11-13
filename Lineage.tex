@@ -78,7 +78,7 @@
 
 \begin{document}
 
-\title{Gineala: Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
+\title{SystemL: Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
 
 \numberofauthors{1} 
 \author{
@@ -125,8 +125,12 @@ Given that this is a repeated pattern taken on by users of the system, it is nat
 that is transparent to users in terms of performance and application complexity.
 
 In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained lineage information
-(data structure cell level, e.g. elements in a matrix). We assume an programming model similar to KeystoneML that builds ML pipelines
-as a chain of data transformations, with each transformation having ML semantics.
+(data lineage at structure cell level, e.g. elements in a matrix). 
+We assume an ML framework with a programming model that abstracts a pipeline as a chain of data transformations, such as KeystoneML
+which builds on top of Apache Spark and expose two building blocks: transformers and estimators.
+A transformer applies a deterministic unary function to data items and produce new data items.
+An estimator takes a collection of data items, and feed them to a training procedure,  and produces a transformer.
+We choose this model because users can declare and instrument lineage collection in the transformer.
 This diagnostic system enables users to specify the lineage of data transformation with a concise interface, customize the instrumentation, 
 collect fine-grained lineage with a minimal performance penalty, and trace the input/output dependency responsively. 
 
@@ -134,30 +138,28 @@ collect fine-grained lineage with a minimal performance penalty, and trace the i
 Lineage tracking has been investigated in various areas.
 Existing lineage tracking system such as xx and and xx focus on coarse-grained lineage of scientific workflow systems.
 The weak inversion method~\cite{woodruff97} for RDBMS was proposed for queries that can tolerate inaccurate lineage information.
-Trio~\cite{widom04} tracks lineage for the RDBMS context with eager materialization of cell mappings.
+Trio~\cite{widom04} tracks lineage for the RDBMS with eager materialization of cell mappings.
 Recent work in fine-grained lineage capturing such as GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} presents
-solutions for mapreduce systems. Both systems expose lineage capturing interface at cell level and construct the 
-lineage based on the order of the key-value pair arrival in an operator. 
-SubZero~\cite{wu13} which is built on SciDB~\cite{brown10} exposes lineage capturing interface at cell level and
-predefines a few high level lineage types, e.g. region lineage.
+solutions for mapreduce systems. 
+Both systems capture lineage on low level operators such as mappers and reducers in the mapreduce system.
+SubZero~\cite{wu13} which is built on SciDB~\cite{brown10} has a similar lineage capturing interface at operators and UDFs.
 
-Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks
-for two reasons.
+Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks for two reasons.
 First, the lineage information collected by systems of xx and the weak inversion method is not sufficient for accurate ML pipeline diagnosis.
 Second, the lineage capturing interface of Trio, GMRW, Newt, and SubZero is designed with a bottom-up approach
-that operates on the underlying system operators (e.g. mapper and combiner in mapreduce systems, UDF in SciDB). 
-This approach is general for all workloads running on the system, but it gives the user very limited flexibility for customized
-instrumentation (specification of lineage type and the data to be collected).
+that operates on the underlying system operators (e.g. mappers and reducers in mapreduce systems, UDFs in SciDB). 
+This approach is general for all workloads running on the system, but it gives the users very limited flexibility for customized
+instrumentation (specification of lineage type and the data to be collected) in the case of users' knowing the exact data to collect.
 
 In this work, we use a top-down approach to design the lineage capturing interface that returns declaration and instrumentation
 flexibility to users. By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
-(Figure~\ref{fig:conceptual} shows an example), we are able to identify seven primitive lineage types.
+(Figure~\ref{fig:conceptual} shows an conceptual example), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional space along one dimension at a time, 
 resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
 The mapping between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
 {\bf geometry} mapping(\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping(\textcircled{3}, \textcircled{8}),
 and {\bf join} mapping. 
-This interface covers 87\% of the data transformations in the current code base of KeystoneML. 
+This interface covers 87\% (39 out of 45) of the data transformations in the current code base of KeystoneML. 
 For transformations that are not covered, the lineage capturing interface allows users to specify a customized mapping function.
 A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 
@@ -179,64 +181,59 @@ A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 \end{center}
 \end{figure}
 
-Diagnosing such an ML pipeline with datasets in a distributed environment can be problematic due to
-the lack of system support of memory states capturing and user interaction.
-To motivate, we present three typical use cases for ML pipeline diagnostics:
-\begin{shortlist}
-\item{\bf Code Validation}: In an image classification pipeline, a user wants to verify the correctness of 
-the positional information of features. 
-\item{\bf Results Inspection}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
-brightness are above a threshold then locate them in the input images.
-\item{\bf Data Cleaning}: In an image classification pipeline, a user observes a particular category has
-a low prediction accuracy, so he wants to remove the training samples of this category and retrain
-the model.
-\end{shortlist}
+
+%Diagnosing such an ML pipeline with datasets in a distributed environment can be problematic due to
+%the lack of system support of memory states capturing and user interaction.
+%To motivate, we present three typical use cases for ML pipeline diagnostics:
+%\begin{shortlist}
+%\item{\bf Code Validation}: In an image classification pipeline, a user wants to verify the correctness of 
+%the positional information of features. 
+%\item{\bf Results Inspection}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
+%brightness are above a threshold then locate them in the input images.
+%\item{\bf Data Cleaning}: In an image classification pipeline, a user observes a particular category has
+%a low prediction accuracy, so he wants to remove the training samples of this category and retrain
+%the model.
+%\end{shortlist}
+
+%The astronomer of the {\bf Results Inspection}
+%case can first filter the results and find these objects that are above the brightness threshold, then query the lineage
+%backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
+%if it is an object or an false detection introduced by cosmic ray. 
+%The user of the {\bf Data Cleaning} case can trace the propagation of the images through the pipeline right before
+%the featurized dataset is fed into training. He then can remove the corresponding data items that are derived from
+%the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
 
 
 
-The astronomer of the {\bf Results Inspection}
-case can first filter the results and find these objects that are above the brightness threshold, then query the lineage
-backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
-if it is an object or an false detection introduced by cosmic ray. 
-The user of the {\bf Data Cleaning} case can trace the propagation of the images through the pipeline right before
-the featurized dataset is fed into training. He then can remove the corresponding data items that are derived from
-the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
+%The performance penalty introduced by lineage capturing comes mostly from persisting in-memory data to storage.
+%In the context of data transformation, there are three potential datasets: the input, the output, and mapping between them.
+%Recording only the metadata (coordinates) mapping rather than the actual data value places a lower bound of the amount
+%of data the lineage system needs to capture. The actual dataset can be derived by rerunning the pipeline.
+%Among the mapping types, geometry mapping takes more storage space than others due to the arbitrary between two collections
+%of metadata. We introduce an high-order function approach to describe each geometry and record the mapping between
+%each pair of geometries to reduce the storage consumption. We also investigate various indexing strategies for better
+%query performance for geometry mapping.
 
-
-
-
-
-
-The performance penalty introduced by lineage capturing comes mostly from persisting in-memory data to storage.
-In the context of data transformation, there are three potential datasets: the input, the output, and mapping between them.
-Recording only the metadata (coordinates) mapping rather than the actual data value places a lower bound of the amount
-of data the lineage system needs to capture. The actual dataset can be derived by rerunning the pipeline.
-Among the mapping types, geometry mapping takes more storage space than others due to the arbitrary between two collections
-of metadata. We introduce an high-order function approach to describe each geometry and record the mapping between
-each pair of geometries to reduce the storage consumption. We also investigate various indexing strategies for better
-query performance for geometry mapping.
-
-We present Gineala, a lineage collecting and serving system that implements the above general solutions.
-Gineala is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
-KeystoneML exposes two building blocks: transformers and estimators. 
-A transformer applies a deterministic unary function to data items and produce new data items.
-An estimator takes a collection of data items, and feed them to a training procedure,  and produces a transformer.
-Gineala interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
-Gineala collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
+We present SystemL, a lineage collecting and serving system that implements the above general solutions.
+SystemL is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
+SystemL interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
+SystemL exploits the metadata of data structure for metadata mapping recording to reduce storage overhead.
+It also use a high order function approach and spatial index for geometry mapping which does not have a regular mapping pattern.
+SystemL collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
 along with the computation and the optional model.
-Gineala stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
+SystemL stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
 of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
 Different from Spark lineage, which tracks partition level data dependency and associated computation for internal system resilience.
-Gineala tracks lineage with a finer granularity at the element level of data structures.
-Besides, Gineala exposes interface for users to specify lineage types and query.
-Upon query, Gineala can load the lineage information from storage and reconstruct the lineage chain.
+SystemL tracks lineage with a finer granularity at the cell level of data structures.
+Besides, SystemL exposes interface for users to specify lineage types and query.
+Upon query, SystemL can load the lineage information from storage and reconstruct the lineage chain.
 Users have the flexibility to specify either to reconstruct a single transformer lineage, a partial chain, or the whole chain.
 
-By examining the KeystoneML code base, we see that Gineala's lineage interface covers 87\% (39 out of 45) of the existing transformers.
+
 Combining the high-order function approach and spatial indexing strategies, 
 the geometry lineage query runs 2x-31x faster than that without index.
 Storage consumption is reduced by up to 45x comparing to the element-wise mapping recording. 
-Our measurements with the three representative ML pipelines show that Gineala lineage 
+Our measurements with the three representative ML pipelines show that SystemL lineage 
 capturing scales no worse than the ML pipelines.
 The performance penalty for the three fore-mentioned use cases ranges from 16\% to 54\%.
 The query for these use cases takes from 0.1~s to 1.8~s. 
@@ -250,12 +247,9 @@ In summary, we make the following contributions:
 \end{shortlist}
 
 
-\section{Background}
+\section{Use Cases and KeystoneML}
 \label{sec:Background}
-In this section, we briefly review the KeystoneML and introduces three use cases of Gineala.
-
-\subsection{KeystoneML}
-KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
+In this section, we present three motivating use cases of SystemL and briefly review KeystoneML.
 
 \subsection{Use Cases}
 \label{sec:Back-cases}
@@ -308,13 +302,18 @@ Either through mathematical analysis or human intervention, they are able to val
 
 \subsubsection{Data Cleaning}
 Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
-A user of the SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, wants to investigate the impact of removing the images
-of the people category.
-Without lineage information, he has to remove the images of people category from the training set and reruns data
+A user of the SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, observes a low prediction accuracy for a category of images, especially 
+when people and dogs are in the same image. A natural investigation is then to remove the images with both people and dogs,
+and test if that improves prediction accuracy.
+
+Without lineage information, the user has to remove the according images from the training set and reruns data
 preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
 With lineage information, the user can intercept the pipeline by loading the output of RowNormalizer directly into KeystoneML,
-filter out the data items that are derived from the people category , and apply the filtered dataset directly to the linear solver.
+filter out the data items that are derived from the images that have people and dogs togetehr , and apply the filtered dataset directly to the linear solver.
 In this case, the rerunning process can bypass the expensive data preparation procedure resulting in shorter turn-around time.
+
+\subsection{KeystoneML}
+KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \section{Mapping}
 \label{sec:Mapping}
@@ -348,6 +347,7 @@ the table order in the join operation.
 \subsection{Dataset and Mapping}
 Conceptually, the input dataset and output dataset can be defined
 as tables with each element's position in the data structure as key.
+In reality, such tables is in the form of a distributed collection such as RDD.
 \newline\newline
 \noindent\begin{minipage}{\textwidth}
 \noindent\begin{minipage}{.2\textwidth}
@@ -511,12 +511,12 @@ For the mappings that are not covered by the primitive functions, we allow users
 
 \section{Requirements}
 \label{sec:Req}
-The requirements of the Gineala lineage system for KeystoneML can be viewed from the functionality and performance perspective.
+The requirements of the SystemL lineage system for KeystoneML can be viewed from the functionality and performance perspective.
 
 \subsection{Functional Requirements}
-Gineala should expose a programming interface for users to declare and operate the lineage of each transformer. 
-Gineala's built-in lineage should cover the most common lineage types and preserve the flexibility for users to declare their own lineage types.
-Gineala also requires an interactive interface for users to load recorded lineage and query over it.
+SystemL should expose a programming interface for users to declare and operate the lineage of each transformer. 
+SystemL's built-in lineage should cover the most common lineage types and preserve the flexibility for users to declare their own lineage types.
+SystemL also requires an interactive interface for users to load recorded lineage and query over it.
 
 The single transformer lineage need to provide the forward query and backward query functionalities. 
 It is  guaranteed that the lineage across transformers can be queried in a chain, as long as the transformers
@@ -528,43 +528,43 @@ In turn, a partial pipeline assembled by a sequence of transformers of the origi
 
 \subsection{Performance Requirements}
 \label{sec:Req-Perf}
-As Gineala incurs additional computation and I/O to record and save lineage, the overall pipeline performance is expected to slowdown.
+As SystemL incurs additional computation and I/O to record and save lineage, the overall pipeline performance is expected to slowdown.
 Especially for KeystoneML that is built upon Apache Spark, unlike other distributed computing framework such as Hadoop~\cite{HADOOP} 
 that writes/reads intermediate data to disk, any additional I/O can introduce a more significant slowdown. 
 The Hadoop-based lineage system Newt~\cite{logothetis13} reported a 20$\sim$50\% slowdown; 
 another Hadoop-based lineage system GMRW~\cite{ikeda11} observed a slowdown of 16$\sim$76\% depending on the workloads;
 the SciDB~\cite{brown10}-based SubZero~\cite{wu13} system introduced 50$\sim$150\% overhead. 
-We expect Gineala's slowdown to the original pipeline to be comparable to these systems.
+We expect SystemL's slowdown to the original pipeline to be comparable to these systems.
 
-When Gineala records lineage, we face tradeoffs between performance slowdown, memory usage and disk space.
+When SystemL records lineage, we face tradeoffs between performance slowdown, memory usage and disk space.
 In some cases, it may run additional computations on the collected lineage to reduce the lineage size. 
 E.g., regressing a sequence of coordinates to a higher order function. 
 In other cases, it may cache all lineage information for a transformer before writing it to the storage. 
-Gineala should be able to automatically instrument the lineage collection to adapt the constraints.
+SystemL should be able to automatically instrument the lineage collection to adapt the constraints.
 
 Lineage information can be massive depending on the transformer, since the input dataset or the intermediate dataset of a pipeline can be large.
 In some transformers, the mapping between the input elements and output elements is complicated. 
 Regress the element-wise mapping to a higher order function can reduce the storage overhead, however it introduce latency when users
-query them. Thus Gineala requires indexing strategies for the recorded lineage to overcome this issue.
+query them. Thus SystemL requires indexing strategies for the recorded lineage to overcome this issue.
 
 \section{Design}
 \label{sec:Design}
-Figure~\ref{fig:architecture} shows the overview of Gineala and its interactions with other components. 
+Figure~\ref{fig:architecture} shows the overview of SystemL and its interactions with other components. 
 Rounded-corner rectangles are components around and inside KeystoneML. 
 The two-sided arrows indicate interactions between components.
 Users compose machine learning pipelines with KeystoneML and submit the compiled DAG to Spark.
 All computation and I/O are done through the Spark Resilient Distributed Dataset (RDD) abstraction.
-With Gineala, users can declare and operate lineage at the transformer level, 
+With SystemL, users can declare and operate lineage at the transformer level, 
 so that the compiled DAG also contains lineage recording and other operations, e.g., save to disk.
-Lineage in Gineala is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
+Lineage in SystemL is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
 Users can load the stored lineage in HDFS to Spark interactive command line interface.
-By calling Gineala primitives, users can query elements of interest, replay transformers, or analyze
+By calling SystemL primitives, users can query elements of interest, replay transformers, or analyze
 the lineage for other purposes.
 
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/architecture}
-\caption {Overview of Gineala and its surrounding components.
+\caption {Overview of SystemL and its surrounding components.
     \label{fig:architecture}
 }
 \end{center}
@@ -572,7 +572,7 @@ the lineage for other purposes.
 
 \subsection{Lineage}
 \label{sec:Design-Lineage}
-For each transformer, Gineala collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
+For each transformer, SystemL collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
 The model stores the trained model of an estimator generated transformer.
 The random parameter holds the information that guarantees the determinism of the transformer.
 
@@ -582,7 +582,7 @@ but instead we keep track of the training parameters that are used to obtain the
 
 \subsection{Mapping}
 \label{sec:Design-Mapping}
-Mapping is a notion that describes the element-wise dependency in Gineala. 
+Mapping is a notion that describes the element-wise dependency in SystemL. 
 It is an abstraction that is independent from specific data structure in the scope of DenseVector, DenseMatrix, and Image.
 
 Consider a transformer that transforms a RDD of matrices to another RDD of matrices.
@@ -600,12 +600,12 @@ As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, 
 Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
 For SIFT, the input elements form a circle with a geographical center and the scale as its radius.
 Similarly, the SourceExtractor's input elements  form an ellipse. 
-Gineala uses a higher-order function to describe the region. 
+SystemL uses a higher-order function to describe the region. 
 Thus the mapping between two regions is expressed as a tuple of two higher-order functions.
 The space complexity goes down to O(1).
 
 Since many softwares such as SIFT and SEP already return the geographical information with the results.
-Gineala exposes some simple interfaces for two dimensional shapes as special cases.
+SystemL exposes some simple interfaces for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
 Using the higher order function involves an issue for query. If the mapping is recorded at the element level, query is straight forward.
@@ -618,14 +618,14 @@ The time complexity of query over Region Mapping is then $O(N^2)$, assuming ther
 To speedup the query performance, we implement and compare several indexing strategies, and a detailed discussion is in \S\ref{sec:RegionIndex}.
 
 \subsection{Lineage Type}
-Gineala defines three lineage interfaces at high level: NarrowLineage, GatherLineage, LinComLineage. 
+SystemL defines three lineage interfaces at high level: NarrowLineage, GatherLineage, LinComLineage. 
 NarrowLineage covers the lineage that has a narrow dependency and GatherLineage covers the dependency in a gather pattern, where the transformer takes a sequence of RDD of data structures and transform them into a single RDD of data structures. 
 LinComLineage is for the transformer which is the output of fitting training dataset to the linear model estimator.
 
 The NarrowLineage can then be further specified with a specific mapping pattern. E.g., NarrowLineage that has One Mapping is named as OneLineage.
-For OneLineage and AllLineage, the users only need to pass the input dataset, output dataset, and the parameters, since Gineala can figure out the element-wise mapping from the metadata of the internal data structure.
+For OneLineage and AllLineage, the users only need to pass the input dataset, output dataset, and the parameters, since SystemL can figure out the element-wise mapping from the metadata of the internal data structure.
 
-For RegionLineage and SampleLineage, Gineala requires the mapping collection for the declaration. 
+For RegionLineage and SampleLineage, SystemL requires the mapping collection for the declaration. 
 Such a collection should be a RDD of tuple list. 
 Each tuple is a pair of the input region and the output region.
 
@@ -643,7 +643,7 @@ As discussed in \S\ref{sec:Req-Perf}, writing lineage to persistent storage can 
 to the Hadoop-based systems, since Spark seeks to eliminate unnecessary I/O between memory and persistent storage.
 One effective way to reduce the I/O overhead is reduce the lineage data size.
 
-Gineala reduces the lineage data size by 1) separating the metadata from the datasets, 2) tracking only the metadata mapping, 
+SystemL reduces the lineage data size by 1) separating the metadata from the datasets, 2) tracking only the metadata mapping, 
 and 3) taking advantage of the mapping types specified by the user.
 
 In \S\ref{sec:Lin-Pipe-Data}, we say an element in a data structure has two properties: the coordinate and the value.
@@ -653,7 +653,7 @@ to the very first transformer in a sequential manner.
 We see that in the last the transformer and other transformers in the middle, the metadata mapping is sufficient to answer
 the query of depending input elements of given output elements. Only in the very first transformer do we need both the metadata
 to find the metadata of the depending input elements and the actual data of these elements.
-So Gineala separates the metadata from actual data and only tracks the metadata mapping.
+So SystemL separates the metadata from actual data and only tracks the metadata mapping.
 
 Another lineage size reduction is contributed by user specified mapping types. 
 The {\bf One Mapping} and {\bf All Mapping} are the mapping types behind the OneLineage and AllLineage, respectively.
@@ -669,27 +669,27 @@ In contrast, the {\bf Region Mapping} and {\bf Sample Mapping} are asymmetric.
 {\bf Sample Mapping} is implemented as a subtype of {\bf Region Mapping}, as it samples a random subset of the input data structure and return that subset as output.
 We can describe the subset as a list of random regions (rectangles in column sampling of a matrix), with each input region maps to an output region.
 To record these two mapping types, metadata of data structures is not sufficient to answer the queries. 
-Gineala needs to record region level mappings instead.
+SystemL needs to record region level mappings instead.
 
 Putting all lineage size reduction strategies together, 
 a profile study of the VOCSIFTFisher pipeline shows that the actual data size is 840.9~GB and the metadata size is 61.3~GB. 
 Writing only metadata can reduce the total I/O amount by a factor of 13.7x.
 
-For the actual data, Gineala only stores the input dataset for the very beginning transformer as mandatory. 
-Users can configure the Gineala to make decisions for other transformers' input and output datasets.
+For the actual data, SystemL only stores the input dataset for the very beginning transformer as mandatory. 
+Users can configure the SystemL to make decisions for other transformers' input and output datasets.
 
 
 
 
 \subsection{Actual Dataset Storage}
-In the previous section, we introduce how Gineala separates the metadata from actual data and saves the metadata mapping.
-However, Gineala still needs the actual data to answer the forward and backward query.
+In the previous section, we introduce how SystemL separates the metadata from actual data and saves the metadata mapping.
+However, SystemL still needs the actual data to answer the forward and backward query.
 
 Considering a multi transformer pipeline, with each transformer having its own input dataset and output dataset.
-The minimal actual dataset Gineala needs to save to persistent storage is the input dataset for the very beginning transformer, as
+The minimal actual dataset SystemL needs to save to persistent storage is the input dataset for the very beginning transformer, as
 the rest datasets can be reproduced by rerunning the pipeline with the input dataset.
 
-Intuitively, the maximal actual dataset Gineala can save to persistent storage contains all input datasets and output dataset for each transformer.
+Intuitively, the maximal actual dataset SystemL can save to persistent storage contains all input datasets and output dataset for each transformer.
 Since a transformer's output dataset is also the input dataset for the succeeding transformer, thus the maximal dataset without duplicates
 should include output datasets of all transformers and the input dataset for the beginning transformer. 
 
@@ -699,17 +699,17 @@ but access to the actual dataset other than the input introduces overhead due to
 Storing the maximal dataset consumes more disk space and more time, but queries over the actual dataset
 have a lower latency.
 
-Assuming Gineala collects lineage information that is complete for the whole pipeline, the space formed by the storage overhead 
+Assuming SystemL collects lineage information that is complete for the whole pipeline, the space formed by the storage overhead 
 (slowdown depends on the storage overhead) and query overhead defines users' flexibility to make actual dataset storing decision.
 
 In other cases, users are only interested in one or few transformers. E.g. debugging the transformer implementation.
 He may preempt that transformer's lineage by recording all its input and output dataset. 
 And no lineage from other transformers is needed.
-Gineala supports such flexibility by letting the user declare and operate lineage for one or few transformers.
+SystemL supports such flexibility by letting the user declare and operate lineage for one or few transformers.
 In turn, the lineage collected in this case only supports query over each individual transformer.
-It these transformers form a sub-pipeline, users can query the lineage throughout this sub-pipeline with Gineala.
+It these transformers form a sub-pipeline, users can query the lineage throughout this sub-pipeline with SystemL.
 
-As introduced in \S\ref{sec:Design-Lineage}, Gineala collects six types of data for lineage: the input dataset, the output dataset,
+As introduced in \S\ref{sec:Design-Lineage}, SystemL collects six types of data for lineage: the input dataset, the output dataset,
 the transformer itself, the mapping collection, the model, and the parameter.
 Among these six data types, the transformer and the collection of mapping are mandatory. 
 The input dataset is mandatory if the transformer is the very first of the pipeline. 
@@ -718,16 +718,16 @@ The output dataset is optional, as it can be reproduced by rerunning the transfo
 The model and parameter are optional.
 
 In terms of data size, the input dataset, the output dataset and the mapping collection is dominant. 
-Since all of these three datasets are of the type of RDD abstraction, Gineala calls the RDD primitive to write these datasets
+Since all of these three datasets are of the type of RDD abstraction, SystemL calls the RDD primitive to write these datasets
 to HDFS, so that each partition is written into the local disk. 
 And loading these RDDs from HDFS can benefit from the locality.
 For other data types, we encapsulate them into a RDD and use the same approach to write them to HDFS.
 
 All these six datasets are written into a directory that is named by concatenating the transformer label, 
 the node sequence id in the pipeline, and the id of the initial input dataset. 
-With id of the initial input dataset, Gineala can figure out the branches of the pipeline.
-By looking into the input/output RDD id, Gineala is able to tell the sequence of each transformer in the pipeline.
-Combining the two previous operations, Gineala can build the lineage of a pipeline in the exact same sequence
+With id of the initial input dataset, SystemL can figure out the branches of the pipeline.
+By looking into the input/output RDD id, SystemL is able to tell the sequence of each transformer in the pipeline.
+Combining the two previous operations, SystemL can build the lineage of a pipeline in the exact same sequence
 as the original pipeline.
 
 \subsection{Region Mapping Index}
@@ -924,7 +924,7 @@ Tracking metadata mapping (geometry mapping) incurs a 89.8~seconds overhead in a
 Building the index for geometry mapping takes 33.9, 69.9, and 349.0~seconds for RTree, KMeans-1, and KMeans-5.
 The Direct strategy crashes due to insufficient memory.
 
-Figure~\ref{sift-query} presents the query performance with these indexing strategies.
+Figure~\ref{fig:sift-query} presents the query performance with these indexing strategies.
 For each strategy, we run queries with {1, 100, 1000, 10000} batch size.
 NoIndex strategy perform worst among the four strategies, the query latency quickly grow over 10,000~ms with batch size of 100.
 The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with batch size of 1000 and 10000, respectively.
@@ -996,7 +996,7 @@ Then we decompose the running time for NoLineage, Meta, and Data, and show the r
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Scalability}
-\caption {Relative Speedup of the VOCSIFTFisher, Source Extractor, and MNIST Pipelines with Gineala over Eight Nodes.
+\caption {Relative Speedup of the VOCSIFTFisher, Source Extractor, and MNIST Pipelines with SystemL over Eight Nodes.
     \label{fig:scalability}
 }
 \end{center}
@@ -1045,7 +1045,16 @@ DBMS~\cite{wu13}, MapReduce frameworks~\cite{ikeda11, logothetis13}, and Linux o
 
 \section{Conclusion and Future Work}
 \label{sec:Conclusion}
-Conclusion
+To enable accurate, flexible, low-overhead lineage collection and responsive lineage query, we present the SystemL lineage system.
+SystemL exposes a concise yet powerful lineage capturing interface for users by formulating the ML pipeline lineage as a sequence
+of multi-dimensional space transformations. The proposed interface has a coverage of 87\% of the transformers and estimators
+in the current KeystoneML code base. Combining the metadata of data structures, the high order function approach and spatial indexing
+strategy, SystemL is able to answer typical query within $\sim$100~ms and $\sim$1~second. Practically, SystemL introduces a
+performance penalty of 16\%-54\% depending on the pipeline and use case.
+
+As future work, we are investigating the diagnosability of the training process in the estimator. We seek to provide the users with
+the fine-grained lineage information inside an estimator to answer queries of supporting training samples for
+a prediction and the impact of certain feature removal or training data removal.
 
 %ACKNOWLEDGMENTS are optional
 \section{Acknowledgments}
