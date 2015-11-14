@@ -54,6 +54,9 @@
 \usepackage{listings}
 \lstset{language=sql, escapeinside={\$}, basicstyle=\footnotesize\ttfamily, mathescape, escapeinside={\%*}{*)}}
 
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+
 \newif\ifdraft
 \drafttrue
 %\draftfalse                                                                              
@@ -153,7 +156,7 @@ instrumentation (specification of lineage type and the data to be collected) in 
 
 In this work, we use a top-down approach to design the lineage capturing interface that returns declaration and instrumentation
 flexibility to users. By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
-(Figure~\ref{fig:conceptual} shows an conceptual example), we are able to identify seven primitive lineage types.
+(Figure~\ref{fig:conceptual} shows an conceptual illustration), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional space along one dimension at a time, 
 resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
 The mapping between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
@@ -272,7 +275,7 @@ Lineage offers a natural way for these users to hone in on the areas where two s
 \end{figure}
 
 As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
-It has been shown that augmenting traditional SIFT (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
+It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
 However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
 By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
 By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
@@ -301,6 +304,7 @@ Then using backward query, they can find corresponding pixels for these bright o
 Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
 
 \subsubsection{Data Cleaning}
+\label{sec:Back-Case-Cleaning}
 Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
 A user of the SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, observes a low prediction accuracy for a category of images, especially 
 when people and dogs are in the same image. A natural investigation is then to remove the images with both people and dogs,
@@ -309,13 +313,13 @@ and test if that improves prediction accuracy.
 Without lineage information, the user has to remove the according images from the training set and reruns data
 preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
 With lineage information, the user can intercept the pipeline by loading the output of RowNormalizer directly into KeystoneML,
-filter out the data items that are derived from the images that have people and dogs togetehr , and apply the filtered dataset directly to the linear solver.
+filter out the data items that are derived from the images that have people and dogs together , and apply the filtered dataset directly to the linear solver.
 In this case, the rerunning process can bypass the expensive data preparation procedure resulting in shorter turn-around time.
 
 \subsection{KeystoneML}
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
-\section{Mapping}
+\section{Formal Discussion}
 \label{sec:Mapping}
 In this section, we formally define the notion of ML pipeline, dataset, mapping and its associated operations of query in the context of 
 relational database.
@@ -331,7 +335,7 @@ of channels.
 An element $e \in I$ has two properties: value $e.value$ and coordinate $e.coor$ (referred as metadata or meta
 in the following discussion). 
 Combining the additional dimension in the collection (RDD or sequence) with the data structure, 
-the metada of an element is a pair of integers, a triple of integers, or a quadruple of integers
+the metadata of an element is a pair of integers, a triple of integers, or a quadruple of integers
 for vector, matrix, and image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
@@ -404,19 +408,54 @@ The mapping of the pipeline is a sequence of left outer join operations of $\{ma
 $mapping_i.out\_meta = mapping_{i+1}.in\_meta$.
 
 \subsection{Mapping Query}
-A forward query with a key over the mapping of a transformer or a pipeline can be expressed as:
+A forward query with a key  ({\it qForward(key)}) over the mapping of a transformer or a pipeline can be expressed as:
 \begin{lstlisting}
 SELECT out_meta
 FROM mapping
 WHERE key = in_meta
 \end{lstlisting}
 
-A forward query with a list of $keys={k_1, k_2, ..., k_n}$ can be expressed as:
+A forward query with a list of $keys={k_1, k_2, ..., k_n}$ ({\it qForward(keys)}) can be expressed as:
 \begin{lstlisting}
 SELECT out_meta
 FROM mapping
 WHERE $k_1$ = in_meta OR ... OR $k_n$=in_meta
 \end{lstlisting}
+
+\subsection{Data Preparation Skipping}
+In use cases such as the data cleaning presented in \S\ref{sec:Back-Case-Cleaning}, users want
+to remove certain suspicious input data items that might relate to bad prediction results and retrain the model then
+test its performance. 
+Repeating the data preparation steps (e.g., from PixelScaler to RowNormalizer in SIFTFisher pipeline) incurs
+long running time.
+One natural thought in such case is ``can we skip the computation applied on the unchanged data items by removing
+the corresponding prepared data items directly?''
+
+Formally, given a data transformation {\it f()} applied on a collection $C$ of vectors \{$v_1, v_2, ..., v_n$\}.
+we say it is safe to remove {\it f($v_i$)} when {\it $f(C/v_i)) = f(C)/f(v_i))$}.
+The notion {\it $C/v_i$} can be interpreted as the collection derived by removing $v_i$ from $C$.
+In other words, function {\it f()} is distributive on vectors \{$v_1, v_2, ..., v_n$\}. 
+With single or few transformers, users are able to track the distributive property.
+However when the pipeline is deep, such property is hard to track.
+
+Using the fine-grained data lineage, we present a validation method for the distributive property.
+We say the mapping of {\it f()} is self-reflected if $qBackward_f(qForward_f(v_i)) \subseteq v_i$, where vector $v_i$ can be viewed 
+as a set of one-dimensional elements.
+
+
+\begin{theorem}
+\label{thm:distributive}
+A data transformation f() is distributive if the mapping of f() is self-reflected.
+\end{theorem}
+
+\begin{proof}
+By contradiction, if f() is not distributive on collection $C$ of vectors  \{$v_1, v_2, ..., v_n$\}, then $\exists e \in v_j $ s.t. $f(v_i)$ takes as input.
+Then $e \in qBackward_f(qForward_f(v_i))$ and $e \in v_i$ which results in  $qBackward_f(qForward_f(v_i)) \nsubseteq v_i$, which violates condition.
+\end{proof}
+
+\begin{corollary}
+A sequence of data transformations ($s = {f_1, f_2, ..., f_n}$) is distributive if the mapping between the very input and output datasets is self-reflected.
+\end{corollary}
 
 \subsection{Mapping Function}
 \label{sec:Map-Func}
@@ -509,25 +548,50 @@ For the mappings that are not covered by the primitive functions, we allow users
 %\end{split}
 %\end{equation}
 
-\section{Requirements}
+\section{Design Goals}
 \label{sec:Req}
-The requirements of the SystemL lineage system for KeystoneML can be viewed from the functionality and performance perspective.
+In this section, we present the design goals of SystemL from the functional and performance perspective.
 
 \subsection{Functional Requirements}
-SystemL should expose a programming interface for users to declare and operate the lineage of each transformer. 
-SystemL's built-in lineage should cover the most common lineage types and preserve the flexibility for users to declare their own lineage types.
-SystemL also requires an interactive interface for users to load recorded lineage and query over it.
+Two basic functions of SystemL is lineage capturing and serving.
+SystemL requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
+collect lineage information and customize instrumentation (deciding what dataset to store). 
+This interface should be concise with a few variations and options.
+This interface should also be powerful in terms of coverage of transformers.
+This interface should be flexible so that users can define their own lineage and instrumentation.
 
-The single transformer lineage need to provide the forward query and backward query functionalities. 
-It is  guaranteed that the lineage across transformers can be queried in a chain, as long as the transformers
-can form a pipeline (the transformers' types conform the pipeline strong type checking).
-
+To serve lineage for query, SystemL requires a user interface to reconstruct and chain collected lineage.
+Each transformer should provide the forward query (qForward()) and backward query (qBackward()) functionality.
+SystemL needs to verify the chained lineage has identical ordering to the pipeline.
 The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
-the lineage can reproduce the identical result and the original result even with the presence of random factors.
+the lineage contains enough information with which users can reproduce the results.
 In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
 
 \subsection{Performance Requirements}
 \label{sec:Req-Perf}
+In general, as lineage capturing incurs additional computation and I/O for mapping materialization and storage, a non-trivial performance
+penalty based on the original workload is expected. 
+Table~\ref{tb:overhead} circulates documented performance penalty introduced by lineage capturing in recent works. 
+
+\begin{table}[ht]
+\begin{center}
+    \caption{Performance Penalty Introduced by Lineage Capturing in Recent Works}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{2.25cm} | p{2.25cm} | p{2.25cm} |}
+    \hline
+    Project & Underlying System & Performance Penalty  \\ \hline \hline
+    GMRW~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
+    Newt~\cite{logothetis13} & Hadoop~\cite{HADOOP} & 20-50\% \\ \hline
+    SubZero~\cite{wu13} & SciDB~\cite{brown10} & 50\%-150\% \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:overhead}
+\end{center}   
+\end{table}
+
+This performance penalty even exacerbates for SystemL, since KeystoneML's distributed computing engine Apache Spark 
+optimizes for in-memory computing
+
 As SystemL incurs additional computation and I/O to record and save lineage, the overall pipeline performance is expected to slowdown.
 Especially for KeystoneML that is built upon Apache Spark, unlike other distributed computing framework such as Hadoop~\cite{HADOOP} 
 that writes/reads intermediate data to disk, any additional I/O can introduce a more significant slowdown. 
