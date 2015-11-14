@@ -614,11 +614,11 @@ Rounded-corner rectangles are components around and inside KeystoneML.
 The two-sided arrows indicate interactions between components.
 Users compose machine learning pipelines with KeystoneML and submit the compiled DAG to Spark.
 All computation and I/O are done through the Spark Resilient Distributed Dataset (RDD) abstraction.
-With SystemL, users can declare and operate lineage at the transformer level, 
+With SystemL, users can declare and instrument lineage at the transformer level, 
 so that the compiled DAG also contains lineage recording and other operations, e.g., save to disk.
 Lineage in SystemL is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
 Users can load the stored lineage in HDFS to Spark interactive command line interface.
-By calling SystemL primitives, users can query elements of interest, replay transformers, or analyze
+By interacting using the query interface, users can query elements of interest, replay transformation, or analyze
 the lineage for other purposes.
 
 \begin{figure}[h]
@@ -632,6 +632,28 @@ the lineage for other purposes.
 
 \subsection{Lineage}
 \label{sec:Design-Lineage}
+SystemL exposes the lineage capturing interface by naming the lineage types with its mapping types between input and output datasets.
+Table~\ref{tb:lineage-interface} summarizes the lineage types and parameters passing by the users.
+\begin{table*}[ht]
+\begin{center}
+    \caption{Primitive Lineage Types and the Interface}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{16cm}|}
+    \hline
+    CollapseLineage(in: RDD[A], out: RDD[B], dimension: Int)  \\ \hline 
+    ExpansionLineage(in:RDD[A], out:RDD[B], dimension: Int) \\ \hline
+    IdentityLineage(in:RDD[A], out:RDD[A]) \\ \hline
+    AllLineage(in:RDD[A], out:RDD[A]) \\ \hline
+    GeoLineage(in:RDD[A], out:RDD[A], mapping: RDD[List[(F,F)]]) \\ \hline
+    LinComLineage(in:RDD[A], out:RDD[A], model: B) \\ \hline
+    JoinLineage(in:Seq[RDD[A]], out:RDD[Seq[A]], dimention: Int) \\ \hline
+    CustomLineage(in:A, out:B, fMap: C=>D, bMap: D=>C) \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{lst:lineage-interface}
+\end{center}   
+\end{table*}
+
 For each transformer, SystemL collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
 The model stores the trained model of an estimator generated transformer.
 The random parameter holds the information that guarantees the determinism of the transformer.
@@ -644,6 +666,9 @@ but instead we keep track of the training parameters that are used to obtain the
 \label{sec:Design-Mapping}
 Mapping is a notion that describes the element-wise dependency in SystemL. 
 It is an abstraction that is independent from specific data structure in the scope of DenseVector, DenseMatrix, and Image.
+
+
+
 
 Consider a transformer that transforms a RDD of matrices to another RDD of matrices.
 A RDD of matrices can be understood as a distributed array of matrices that is distributed across a cluster.
