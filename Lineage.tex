@@ -589,30 +589,26 @@ Table~\ref{tb:overhead} circulates documented performance penalty introduced by 
 \end{center}   
 \end{table}
 
-This performance penalty even exacerbates for SystemL, since KeystoneML's distributed computing engine Apache Spark 
-optimizes for in-memory computing
+This performance penalty problem exacerbates for SystemL, since KeystoneML's distributed computing engine Apache Spark 
+optimizes for in-memory computing and do not write intermediate data to disks unless it is a shuffle operation. 
+Comparing to systems such as Hadoop, the same amount of I/O of SystemL will introduce a more significant penalty.
+Despite this obstacle, we expect SystemL's performance penalty to be comparable to the existing systems.
 
-As SystemL incurs additional computation and I/O to record and save lineage, the overall pipeline performance is expected to slowdown.
-Especially for KeystoneML that is built upon Apache Spark, unlike other distributed computing framework such as Hadoop~\cite{HADOOP} 
-that writes/reads intermediate data to disk, any additional I/O can introduce a more significant slowdown. 
-The Hadoop-based lineage system Newt~\cite{logothetis13} reported a 20$\sim$50\% slowdown; 
-another Hadoop-based lineage system GMRW~\cite{ikeda11} observed a slowdown of 16$\sim$76\% depending on the workloads;
-the SciDB~\cite{brown10}-based SubZero~\cite{wu13} system introduced 50$\sim$150\% overhead. 
-We expect SystemL's slowdown to the original pipeline to be comparable to these systems.
+Lineage information can be massive depending on the pipeline, since the input or the intermediate dataset of a pipeline can be large.
+In some transformers, the mapping between the input elements and output elements does not conform a pattern, e.g., Geometry mapping.
+We need advance technique to reduce the storage burst introduced by such mappings.
 
-When SystemL records lineage, we face tradeoffs between performance slowdown, memory usage and disk space.
-In some cases, it may run additional computations on the collected lineage to reduce the lineage size. 
-E.g., regressing a sequence of coordinates to a higher order function. 
-In other cases, it may cache all lineage information for a transformer before writing it to the storage. 
-SystemL should be able to automatically instrument the lineage collection to adapt the constraints.
+Using SystemL for ML pipeline diagnosing requires a low-latency interaction between users and the lineage serving unit.
+As documented in the report~\cite{nielsen2009} in human computer interaction, 1~second latency is the boundary to keep users' thought flow while 10~seconds
+is the boundary to loose users attention.
+We expect SystemL's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
 
-Lineage information can be massive depending on the transformer, since the input dataset or the intermediate dataset of a pipeline can be large.
-In some transformers, the mapping between the input elements and output elements is complicated. 
-Regress the element-wise mapping to a higher order function can reduce the storage overhead, however it introduce latency when users
-query them. Thus SystemL requires indexing strategies for the recorded lineage to overcome this issue.
-
-\section{Design}
+\section{Design and Implementation}
 \label{sec:Design}
+In this section, we discuss SystemL's design of lineage capturing and instrumentation interface, 
+storage space reduction and query performance optimization with indexing strategies.
+
+\subsection{Overview}
 Figure~\ref{fig:architecture} shows the overview of SystemL and its interactions with other components. 
 Rounded-corner rectangles are components around and inside KeystoneML. 
 The two-sided arrows indicate interactions between components.
