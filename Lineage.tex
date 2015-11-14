@@ -1039,8 +1039,41 @@ images and conduct a verification.
 
 \section{Related Work}
 \label{sec:Related}
-Lineage capturing and query systems have been proposed for RDMBS~\cite{widom04}, array-based
-DBMS~\cite{wu13}, MapReduce frameworks~\cite{ikeda11, logothetis13}, and Linux operating system~\cite{devecsery14}.
+Researchers have extensively studied data lineage (in some cases referred as data provenance) for various purposes.
+For scientific workflow systems such as  Chimera~\cite{foster02}, Taverna~\cite{oinn02}, and ESSW~\cite{frew01}, 
+collects coarse-grained lineage of file metadata and according computation. 
+Similar work has been well summarized by survey~\cite{simmhan05, freire08, bose05}
+Recent work~\cite{altintas10} investigates how to integrate the lineage of workflow executions
+in a collaborative environment. Coarse-grained lineage is useful in these systems to trace the data and code dependencies.
+Since the lineage collected is coarse-grained, it is not sufficient for cell level diagnosis of ML pipelines.
+
+Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
+data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
+Recent works of GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} collects fine-grained lineage for the mapreduce
+systems. SubZero~\cite{wu13} proposes a prototype lineage system for array-based database system SciDB~\cite{brown10}.
+All these systems employ a bottom-up approach to design lineage capturing interface as the underlying systems all have well regulated low level operators.
+For example, the data warehouse has the aggregate, select, project, join operators. 
+RDMBS has its SQL operators. Mapreduce systems formulates the computation as mappers and reducers.
+The curated database defines four operators of insert, delete, copy and paste.
+One of SubZero's contributions is the region lineage that collects fine-grained lineage for UDFs besides the built-in operators in SciDB. 
+In contrast, an ML pipeline can be viewed as a chain of user-defined data transformations, and the users often have the knowledge 
+of lineage types and data of interest since they are the designers of the pipeline. 
+Though lineage capturing interface designed with the bottom-up approach is general to support applications running on top these systems,
+it exposes very limited flexibility of lineage type declaration and instrumentation to users.
+
+Researchers also have tried to collect fine-grained lineage with other approaches.
+Weak inversion and verification methods~\cite{woodruff97} are proposed to support approximate lineage collection.
+Dynamic program analysis is employed to capture fine-grained lineage inside non-relational operators~\cite{zhang07} with 
+a 7.5$\sim$39.8x slowdown comparing the original program. 
+These approaches do not fit the ML pipeline lineage scenario since they either loose the lineage accuracy or introduce
+excessive performance penalty.
+The Arnold system~\cite{devecsery14} captures fine-grained lineage at operating system process level by recoding
+all non-deterministic data such as the order, return values, modified memory addresses, and many others. 
+This approach can collect fine-grain lineage for any process running on top of the operating system, however
+it looses track of the upper level data structures (e.g., vector, matrix, images), which are fundamental to ML pipelines.
+One step beyond fine-grained lineage, researches~\cite{meliou10, meliou11} explores the causality and responsibility
+of inputs to the results. Though the causality and responsibility is relatively easier for data transformations in ML pipelines.
+It can be applied in the training process analysis to infer the contribution of individual training sample to the model and predictions.
 
 
 \section{Conclusion and Future Work}
