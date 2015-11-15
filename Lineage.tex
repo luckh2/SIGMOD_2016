@@ -603,10 +603,9 @@ As documented in the report~\cite{nielsen2009} in human computer interaction, 1~
 is the boundary to loose users attention.
 We expect SystemL's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
 
-\section{Design and Implementation}
+\section{Design}
 \label{sec:Design}
-In this section, we discuss SystemL's design of lineage capturing and instrumentation interface, 
-storage space reduction and query performance optimization with indexing strategies.
+In this section, we discuss SystemL's layered design of lineage capturing and instrumentation interface, 
 
 \subsection{Overview}
 Figure~\ref{fig:architecture} shows the overview of SystemL and its interactions with other components. 
@@ -630,94 +629,96 @@ the lineage for other purposes.
 \end{center}
 \end{figure}
 
-\subsection{Lineage}
+\subsection{Lineage Interface}
 \label{sec:Design-Lineage}
-SystemL exposes the lineage capturing interface by naming the lineage types with its mapping types between input and output datasets.
+SystemL exposes the lineage capturing interface by naming the lineage type specific class with its mapping types between input and output datasets.
+All the type specific class inherits an abstract class of Lineage, which define common methods shared among the type specific classes:
+\begin{shortlist}
+\item{} qForward(keys: List[Coor]): List[Coor], given a list of element metadata (coordinates) returns the forward query results on the metadata mapping of the lineage
+\item{} qBackward(keys: List[Coor]): List[Coor], given a list of element metadata (coordinates) returns the backward query results on the metadata mapping of the lineage
+\item{} saveMapping(): saves the collection of metadata mappings of a lineage to disks
+\item{} saveInput(): saves the input dataset to disks
+\item{} saveOutput(): saves the output dataset to disks.
+\end{shortlist}
+
+
 Table~\ref{tb:lineage-interface} summarizes the lineage types and parameters passing by the users.
-\begin{table*}[ht]
+\begin{table}[ht]
 \begin{center}
-    \caption{Primitive Lineage Types and the Interface}
+    \caption{Primitive Lineage Types}
     \begin{scriptsize}
-    \begin{tabular}{ | p{16cm}|}
+    \begin{tabular}{ | p{8cm}|}
     \hline
-    CollapseLineage(in: RDD[A], out: RDD[B], dimension: Int)  \\ \hline 
-    ExpansionLineage(in:RDD[A], out:RDD[B], dimension: Int) \\ \hline
-    IdentityLineage(in:RDD[A], out:RDD[A]) \\ \hline
-    AllLineage(in:RDD[A], out:RDD[A]) \\ \hline
-    GeoLineage(in:RDD[A], out:RDD[A], mapping: RDD[List[(F,F)]]) \\ \hline
-    LinComLineage(in:RDD[A], out:RDD[A], model: B) \\ \hline
-    JoinLineage(in:Seq[RDD[A]], out:RDD[Seq[A]], dimention: Int) \\ \hline
-    CustomLineage(in:A, out:B, fMap: C=>D, bMap: D=>C) \\ \hline
+    CollapseLineage(in, out, transformer, dimension) \\ \hline 
+    ExpansionLineage(in, out, transformer, dimension) \\ \hline
+    IdentityLineage(in, out, transformer) \\ \hline
+    AllLineage(in, out, transformer) \\ \hline
+    GeoLineage(in, out, transformer, mappingCollection) \\ \hline
+    LinComLineage(in, out, transformer, model) \\ \hline
+    JoinLineage(in, out, transformer, dimension) \\ \hline
+    CustomLineage(in, out, transformer, fFunc, bFunc, model, rand) \\ \hline
     \end{tabular}
     \end{scriptsize}
-    \label{lst:lineage-interface}
+    \label{tb:lineage-interface}
 \end{center}   
-\end{table*}
+\end{table}
 
-For each transformer, SystemL collects five types of data: the input dataset, the output dataset, the transformer, the collection of mapping, the model, and the random parameter.
-The model stores the trained model of an estimator generated transformer.
-The random parameter holds the information that guarantees the determinism of the transformer.
+In general, SystemL lineage capturing interface can collect six types of data: 
+the input dataset (in), the output dataset (out), the transformer (transformer), 
+the collection of mapping (mappingCollection), the model (model), and the random 
+parameter (rand).
 
-For estimators, we only consider linear model estimators in the current implementation. 
-We view linear model estimators as transformers without model or random parameters, 
-but instead we keep track of the training parameters that are used to obtain the output model (the output dataset). 
+By checking the input and output dataset, SystemL is able to figure out the metadata of each data structure then use
+it to declare the mapping objects, which is described in the following section.
 
 \subsection{Mapping}
 \label{sec:Design-Mapping}
-Mapping is a notion that describes the element-wise dependency in SystemL. 
-It is an abstraction that is independent from specific data structure in the scope of DenseVector, DenseMatrix, and Image.
+Mapping on the abstract level provides two interfaces: qForward() and qBackward(). Both interfaces
+take a list of element metadata (coordinates) and return the query results accordingly.
+
+For all mapping types presented in ~\S\ref{sec:Map-Func} except Geometry mapping, 
+SystemL infers metadata of data structures automatically. 
+For example in an All mapping between two matrices of 5 rows and 5 columns,
+the mapping is recorded as AllMapping(twoDMeta(5, 5), twoDMeta(5,5)). 
+So upon forward query, AllMapping returns the coordinates of all 25 elements in the output matrix by only looking into the matrix metadata.
+
+We define three types of metadata to simplify the interface:
+\begin{shortlist}
+\item{} oneDMeta: Int
+\item{} twoDMeta: (Int, Int)
+\item{} threeDMeta: (Int, Int, Int)
+\end{shortlist}  
+SystemL also uses this data structure metadata to checkout out-of-bound errors if the given key is outside the space of the data structure.
+
+For geometry mapping, the mapping is arbitrary and can not take benefit from data structure metadata, 
+Intuitively, users to pass the exact mapping in the form of a collection, inside which is a list of tuples, where each tuple 
+contains one set of input element coordinates and one set of output geometry element coordinates. 
+This simple solution takes a tremendous amount of space to materialize the mapping in memory and store on disks.
+The next section discusses the technical approach to reduce the size of geometry mapping and according indexing strategies.
 
 
-
-
-Consider a transformer that transforms a RDD of matrices to another RDD of matrices.
-A RDD of matrices can be understood as a distributed array of matrices that is distributed across a cluster.
-We observe that many transformations in various pipelines has narrow dependencies, where a output matrix
-only depends on one input matrix. Figure~\ref{fig:narrowmapping} shows this case. 
-The left mapping is from an input RDD of matrices to an output RDD of matrices. 
-
-
-
-
-\subsection{Region Mapping}
-\label{sec:Design-RegionMapping}
-As can be seen in the region mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the input elements in the corresponding region. If the output region has $N$ elements and the input region has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
+\subsection{Geometry Mapping}
+\label{sec:Design-GeometryMapping}
+As can be seen in the geometry mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the input elements in the corresponding geometry. If the output geometry has $N$ elements and the input geometry has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
 Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
 For SIFT, the input elements form a circle with a geographical center and the scale as its radius.
-Similarly, the SourceExtractor's input elements  form an ellipse. 
-SystemL uses a higher-order function to describe the region. 
-Thus the mapping between two regions is expressed as a tuple of two higher-order functions.
+Similarly, the SourceExtractor's input elements form an ellipse. 
+SystemL uses a high-order function to describe the geometry such as circle and ellipse. 
+Thus the mapping between two geometries is expressed as a tuple of two higher-order functions.
 The space complexity goes down to O(1).
 
-Since many softwares such as SIFT and SEP already return the geographical information with the results.
-SystemL exposes some simple interfaces for two dimensional shapes as special cases.
+Since many softwares such as SIFT and SourceExtractor already return the geographical information with the results.
+SystemL exposes a simple interface for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
-Using the higher order function involves an issue for query. If the mapping is recorded at the element level, query is straight forward.
-Given an output element, a backward query returns corresponding input elements.
-Now both the input elements and output elements are encoded with a higher order function. 
+Using the high order function involves an issue for query. 
+As both the input elements and output elements are encoded with a higher order function. 
 And the mapping between input function and output function is stored in a list. 
 A query that takes an output element as key thus needs to iterate over all input functions and test if the key is in the function or not.
 If the key is in an input function, it then returns the mapping output function, and expands the function to a group of coordinates.
-The time complexity of query over Region Mapping is then $O(N^2)$, assuming there are $N$ tuples in the list and each input function expands to $N$ elements.
+The time complexity of query over geometry mapping is then $O(N^2)$, assuming there are $N$ tuples in the list and each input function expands to $N$ elements.
 To speedup the query performance, we implement and compare several indexing strategies, and a detailed discussion is in \S\ref{sec:RegionIndex}.
 
-\subsection{Lineage Type}
-SystemL defines three lineage interfaces at high level: NarrowLineage, GatherLineage, LinComLineage. 
-NarrowLineage covers the lineage that has a narrow dependency and GatherLineage covers the dependency in a gather pattern, where the transformer takes a sequence of RDD of data structures and transform them into a single RDD of data structures. 
-LinComLineage is for the transformer which is the output of fitting training dataset to the linear model estimator.
-
-The NarrowLineage can then be further specified with a specific mapping pattern. E.g., NarrowLineage that has One Mapping is named as OneLineage.
-For OneLineage and AllLineage, the users only need to pass the input dataset, output dataset, and the parameters, since SystemL can figure out the element-wise mapping from the metadata of the internal data structure.
-
-For RegionLineage and SampleLineage, SystemL requires the mapping collection for the declaration. 
-Such a collection should be a RDD of tuple list. 
-Each tuple is a pair of the input region and the output region.
-
-The GatherLineage is implemented within the GatherTransformer.
-And so is LinComLineage for the linear model estimator. LinComLineage requires the model as input for declaration.
-Both these two lineage types can adapt to DenseVectors, DenseMatrix, and Images. 
-Users do not have to modify these two lineage types. 
 
 \section{Implementations}
 \label{sec:Impl}
