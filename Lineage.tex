@@ -717,12 +717,12 @@ And the mapping between input function and output function is stored in a list.
 A query that takes an output element as key thus needs to iterate over all input functions and test if the key is in the function or not.
 If the key is in an input function, it then returns the mapping output function, and expands the function to a group of coordinates.
 The time complexity of query over geometry mapping is then $O(N^2)$, assuming there are $N$ tuples in the list and each input function expands to $N$ elements.
-To speedup the query performance, we implement and compare several indexing strategies, and a detailed discussion is in \S\ref{sec:RegionIndex}.
+To speedup the query performance, we implement and compare several indexing strategies, and a detailed discussion is in \S\ref{sec:GeometryIndex}.
 
 
 \section{Implementations}
 \label{sec:Impl}
-This section discusses implementation details for lineage collection, I/O, and region mapping index.
+This section discusses implementation details for lineage collection, I/O, and geometry mapping index.
 
 \subsection{Metadata Separation}
 As discussed in \S\ref{sec:Req-Perf}, writing lineage to persistent storage can introduce a more dramatical slowdown for KeystoneML comparing
@@ -751,11 +751,11 @@ So is for {\bf All Mapping}, the dependency of all input elements to an output e
 Both the forward and backward query shall return all elements in the data structure.
 Thus for {\bf One Mapping} and {\bf All Mapping}, recording the metadata of the matrix is enough to answer the forward and backward query.
 
-In contrast, the {\bf Region Mapping} and {\bf Sample Mapping} are asymmetric. 
-{\bf Sample Mapping} is implemented as a subtype of {\bf Region Mapping}, as it samples a random subset of the input data structure and return that subset as output.
-We can describe the subset as a list of random regions (rectangles in column sampling of a matrix), with each input region maps to an output region.
+In contrast, the {\bf Geometry Mapping} and {\bf Sample Mapping} are asymmetric. 
+{\bf Sample Mapping} is implemented as a subtype of {\bf Geometry Mapping}, as it samples a random subset of the input data structure and return that subset as output.
+We can describe the subset as a list of random geometries (rectangles in column sampling of a matrix), with each input geometry maps to an output geometry.
 To record these two mapping types, metadata of data structures is not sufficient to answer the queries. 
-SystemL needs to record region level mappings instead.
+SystemL needs to record geometry level mappings instead.
 
 Putting all lineage size reduction strategies together, 
 a profile study of the VOCSIFTFisher pipeline shows that the actual data size is 840.9~GB and the metadata size is 61.3~GB. 
@@ -816,12 +816,12 @@ By looking into the input/output RDD id, SystemL is able to tell the sequence of
 Combining the two previous operations, SystemL can build the lineage of a pipeline in the exact same sequence
 as the original pipeline.
 
-\subsection{Region Mapping Index}
-\label{sec:RegionIndex}
-In \S\ref{sec:Design-RegionMapping}, we introduced the notion of region mapping and how we user higher-order function
-to describe the region for the purpose of less space consumption. We also present that query of such region mapping
+\subsection{Geometry Mapping Index}
+\label{sec:GeometryIndex}
+In \S\ref{sec:Design-GeometryMapping}, we introduced the notion of geometry mapping and how we user higher-order function
+to describe the geometry for the purpose of less space consumption. We also present that query of such geometry mapping
 can be slow due to the encoding. 
-In this section, we discuss four indexing strategies to speedup the query over the region mapping. 
+In this section, we discuss four indexing strategies to speedup the query over the geometry mapping. 
 The four indexing strategies are referred as {\bf NoIndex}, {\bf Direct}, {\bf RTree}, and {\bf KMeans}, respectively.
 For simplicity, we only discuss forward query from the input to the output in this section.
 The backward query works in the same way as the forward query.
@@ -831,20 +831,20 @@ We use the example in Figure~\ref{fig:example} in the following discussion.
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/example}
-\caption {A region mapping example, the left matrix is input and the right matrix is output. The mapping between the regions are shown using gray shades.
+\caption {A geometry mapping example, the left matrix is input and the right matrix is output. The mapping between the geometries are shown using gray shades.
     \label{fig:example}
 }
 \end{center}
 \end{figure}
 
-Table~\ref{tb:example} shows the mapping for each element and the regressed 2D region mapping.
+Table~\ref{tb:example} shows the mapping for each element and the regressed 2D geometry mapping.
 \begin{table}[ht]
 \begin{center}
-    \caption{Element-wise mapping and regressed region mapping of the example in Figure~\ref{fig:example}}
+    \caption{Element-wise mapping and regressed geometry mapping of the example in Figure~\ref{fig:example}}
     \begin{scriptsize}
     \begin{tabular}{ | p{1.75cm} | p{1.75cm} | p{1.75cm} | p{1.75cm} |}
     \hline
-    Input & Region & Output & Region \\ \hline \hline
+    Input & Geometry & Output & Geometry \\ \hline \hline
     (0,0),...,(1,1) & Circle\_0 & (0,0),(1,0) & Rect\_0 \\ \hline
     (0,2),...,(1,3) & Circle\_1 & (0,1),(1,1) & Rect\_1 \\ \hline
     (2,0),...,(3,1) & Circle\_2 & (0,2),(1,2) & Rect\_2 \\ \hline
@@ -856,15 +856,15 @@ Table~\ref{tb:example} shows the mapping for each element and the regressed 2D r
 \end{table} 
 
 \subsubsection{No Index}
-Using the example in Table~\ref{tb:example}, with {\bf NoIndex} strategy, query an element needs to traverse all circles (input regions).
+Using the example in Table~\ref{tb:example}, with {\bf NoIndex} strategy, query an element needs to traverse all circles (input geometries).
 If the element is in a circle, the query returns the all output elements expanded from the mapping rectangle.
 The time complexity of a query is $O(N)$, where N is the number of circles. 
 
 \subsubsection{Direct Index}
-To build the {\bf Direct} index, we use each input element as key and the associated region as the value, as shown in Figure~\ref{fig:direct}.
-We rely on the underlying runtime system for the optimization of storing repeated regions as an single object,
-then use an pointer (hash value of the object) to point to the region object, as shown in Figure~\ref{fig:direct-optimized}.
-This optimization can reduce the storage space of index if the region object is larger than the hash value. 
+To build the {\bf Direct} index, we use each input element as key and the associated geometry as the value, as shown in Figure~\ref{fig:direct}.
+We rely on the underlying runtime system for the optimization of storing repeated geometries as an single object,
+then use an pointer (hash value of the object) to point to the geometry object, as shown in Figure~\ref{fig:direct-optimized}.
+This optimization can reduce the storage space of index if the geometry object is larger than the hash value. 
 A query of an element takes two steps: the first step returns the hash value for that element and the second step returns the rectangle. 
 The space complexity of {\bf Direct} index is $O(k*N)$, where $k$ is the number of circles and $N$ is the number of elements in each circle.
 For simplicity, the space complexity of the {\bf Direct} index is $O(N^2)$.
@@ -890,18 +890,18 @@ The time complexity of building index and query are $O(N^2)$ and $O(1)$, respect
 R-tree~\cite{guttman1984} has been introduced to index multidimensional information.
 To simplify the discussion, we use the example shown in Figure~\ref{fig:example} and build the index in a two dimensional space.
 The average query time complexity is $O(logN)$, while the worst case is $O(N)$. 
-The worst case happens when querying an element in a region where all leaf nodes overlap.
-Variants of R-tree, such as R+-tree and R*-tree, seek to improve the worst case query speed by minimizing the overlapped region at leaf nodes.
+The worst case happens when querying an element in a geomerey where all leaf nodes overlap.
+Variants of R-tree, such as R+-tree and R*-tree, seek to improve the worst case query speed by minimizing the overlapped geomerey at leaf nodes.
 While they introduce additional overhead when building the index.
 
-In our use cases, it is rare that a single element occurs in all regions. 
+In our use cases, it is rare that a single element occurs in all geometries. 
 R-tree is sufficient to validate the idea of spatial indexing.
 ~\zhaonote{mention kd-tree in the related work.}
 
 We use an open source R-tree implementation, Archery~\cite{osheim13} to build the {\bf RTree} index.
 In the Archery implementation, both the leaf nodes and the non-leaf nodes are abstracted as rectangles.
-To differentiate from the rectangle regions, we call it box.
-To adapt the region to Archery, first we compute the bounding box of each circle, then we use
+To differentiate from the rectangle geometries, we call it box.
+To adapt the geometry to Archery, first we compute the bounding box of each circle, then we use
 a tuple of the bounding box and the circle as leaf node of the R-tree. 
 The index is built upon the bounding boxes. 
 The query of an input element (0,0) in the R-tree returns a tuple of the bounding box (center: (0.5,0.5), height:1, width:1) and circle\_0.
@@ -913,14 +913,14 @@ Practically the time complexity of query a R-tree is $log(N)$ in our use cases.
 And the space complexity for {\bf RTree} index is $log(N)$.
 
 \subsubsection{KMeans Index}
-Inspired by the distribution of the regions in the SIFTExtract and the SourceExtractor transformer,
+Inspired by the distribution of the geometries in the SIFTExtract and the SourceExtractor transformer,
 we come up with a simple index with two level of nodes.
-We first cluster the regions using the KMeans~\cite{macqueen67} algorithm 
+We first cluster the geometries using the KMeans~\cite{macqueen67} algorithm 
 and then build a single layer non-leaf nodes with each non-leaf node covering a cluster.
 
-We specify $\sqrt{N}$ clusters, where N is the number of regions, 
-since $\sqrt{N}$ is the optimal cluster number for the worst case query when N regions are uniformly distributed in a two dimensional space.
-Clustering $N$ regions into $k$ clusters results in $\frac{N}{k}$ elements in each cluster. 
+We specify $\sqrt{N}$ clusters, where N is the number of geometries, 
+since $\sqrt{N}$ is the optimal cluster number for the worst case query when N geometries are uniformly distributed in a two dimensional space.
+Clustering $N$ geometriess into $k$ clusters results in $\frac{N}{k}$ elements in each cluster. 
 Thus there are $k$ non-leaf nodes.
 A worst case query needs to traverses all $k$ non-leaf nodes and all $\frac{N}{k}$ leaf node in the cluster.
 $k+\frac{N}{k}$ has its minimum when $k=\sqrt{N}$. 
@@ -989,7 +989,7 @@ CDH4 distribution of Hadoop.
 
 \subsection{Geometry Mapping Index}
 \label{sec:Perf-Index}
-With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:RegionIndex}.
+With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:GeometrieIndex}.
 We use a workload with 5,000 pairs of input and output matrix, with each pair producing 60,000 geometry mappings that are uniformly distributed
 in 2D space. The total number of mappings capture is 300 million. The experiment was executed on a 16 node cluster.
 
