@@ -574,9 +574,9 @@ Table~\ref{tb:overhead} circulates documented performance penalty introduced by 
 
 \begin{table}[ht]
 \begin{center}
-    \caption{Performance Penalty Introduced by Lineage Capturing in Recent Works}
+    \caption{Performance Penalty Reported in Recent Lineage System}
     \begin{scriptsize}
-    \begin{tabular}{ | p{2.25cm} | p{2.25cm} | p{2.25cm} |}
+    \begin{tabular}{ | p{2cm} | p{2.5cm} | p{2.8cm} |}
     \hline
     Project & Underlying System & Performance Penalty  \\ \hline \hline
     GMRW~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
@@ -599,7 +599,7 @@ We need advance technique to reduce the storage burst introduced by such mapping
 
 Using SystemL for ML pipeline diagnosing requires a low-latency interaction between users and the lineage serving unit.
 As documented in the report~\cite{nielsen2009} in human computer interaction, 1~second latency is the boundary to keep users' thought flow while 10~seconds
-is the boundary to loose users attention.
+is the boundary to loose users' attention.
 We expect SystemL's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
 
 \section{Design}
@@ -727,6 +727,7 @@ To speedup the query performance, we implement and compare several indexing stra
 This section discusses implementation details for lineage collection, I/O, and geometry mapping index.
 
 \subsection{Metadata Separation}
+\zhaonote{separating metadata from actual data and leaves it as user's option}
 As discussed in \S\ref{sec:Req-Perf}, writing lineage to persistent storage can introduce a more dramatical slowdown for KeystoneML comparing
 to the Hadoop-based systems, since Spark seeks to eliminate unnecessary I/O between memory and persistent storage.
 One effective way to reduce the I/O overhead is reduce the lineage data size.
@@ -743,6 +744,7 @@ the query of depending input elements of given output elements. Only in the very
 to find the metadata of the depending input elements and the actual data of these elements.
 So SystemL separates the metadata from actual data and only tracks the metadata mapping.
 
+\subsection{Mapping Inversion}
 Another lineage size reduction is contributed by user specified mapping types. 
 The {\bf One Mapping} and {\bf All Mapping} are the mapping types behind the OneLineage and AllLineage, respectively.
 Both the two mapping types are symmetric.
