@@ -1096,6 +1096,16 @@ In the SIFTFisher case, capturing both metadata mapping and datasets shows scala
 This is because the SIFTFisher performance is memory-bounded on 8 machines, once the memory bound is relieved, the actual performance
 exceeds the expectation.
 
+\subsection{Query Performance}
+\begin{figure}[h]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/TypeQuery-Time}
+\caption {Query time for the seven lineage types (in log scale).
+    \label{fig:typequery}
+}
+\end{center}
+\end{figure}
+
 \subsection{Use Case}
 In the {\bf code validation} case, users instrument the SIFTFisher pipeline by only recording the metadata mapping of the SIFTExtractor transformer.
 Upon validation, users can query extracted feature, and locate the positions of the feature in the input image. With some external visualization tool,
