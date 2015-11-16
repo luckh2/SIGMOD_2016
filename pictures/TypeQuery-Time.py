@@ -22,10 +22,10 @@ width = 0.2       # the width of the bars
 ax = plt.subplot()
 ax.set_ylim([1, 10000])
 
-rects1 = ax.bar(ind, Random, width, color='blue', yerr=RandomSDV)
-rects2 = ax.bar(ind+width, Batch100, width, color='orange', hatch="/", yerr=Batch100SDV)
-rects3 = ax.bar(ind+2*width, Batch1K, width, color='red', hatch="x", yerr=Batch1KSDV)
-rects4 = ax.bar(ind+3*width, Batch10K, width, color='green', hatch="\\", yerr=Batch10KSDV)
+rects1 = ax.bar(ind, Random, width, color='blue', yerr=RandomSDV, ecolor='black', error_kw=dict(elinewidth=2))
+rects2 = ax.bar(ind+width, Batch100, width, color='orange', hatch="/", yerr=Batch100SDV, ecolor='black', error_kw=dict(elinewidth=2))
+rects3 = ax.bar(ind+2*width, Batch1K, width, color='red', hatch="x", yerr=Batch1KSDV, ecolor='black', error_kw=dict(elinewidth=2))
+rects4 = ax.bar(ind+3*width, Batch10K, width, color='green', hatch="\\", yerr=Batch10KSDV,ecolor='black', error_kw=dict(elinewidth=2))
 ax.grid(True)
 
 #ax.set_yticklabels((500, 20000, 40000, 60000, 80000), size='large')
