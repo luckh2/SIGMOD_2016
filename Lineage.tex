@@ -421,6 +421,7 @@ WHERE $k_1$ = in_meta OR ... OR $k_n$=in_meta
 \end{lstlisting}
 
 \subsection{Data Preparation Skipping}
+\label{sec:formal-skipping}
 In use cases such as the data cleaning presented in \S\ref{sec:Back-Case-Cleaning}, users want
 to remove certain suspicious input data items that might relate to bad prediction results and retrain the model then
 test its performance. 
@@ -1100,7 +1101,10 @@ This is because the SIFTFisher performance is memory-bounded on 8 machines, once
 exceeds the expectation.
 
 \subsection{Query Performance}
-
+To understand the query performance and scalability of each lineage type, we run queries with a varying size of keys
+and present the performance in Figure~\ref{fig:typequery}. For each lineage type, we use a distributed collection (RDD) of 5,000 pairs of 
+input and output data structures (vector, matrix, image) and distribute them into 200 partitions over 16 machines.
+Table~\ref{tb:typequery-stats} shows the metadata settings of the input and output data structure in each query
 
 \begin{figure}[h]
 \begin{center}
@@ -1110,6 +1114,43 @@ exceeds the expectation.
 }
 \end{center}
 \end{figure}
+
+\begin{table}[ht]
+\begin{center}
+    \caption{Data Structure Settings}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{1.5cm} | p{3cm} | p{3cm} |}
+    \hline
+    Type & Input Structure & Output Structure \\ \hline \hline
+    All & Vector(40960) & Vector(40960) \\ \hline
+    Identity & Matrix(80, 512) & Matrix(80, 512) \\ \hline
+    LinCom & Vector(40960) & Vector(20) \\ \hline
+    Expansion & Matrix(80, 512) & Vector(40960) \\ \hline
+    Collapse & Image(375, 500, 3) & Matrix(375, 500) \\ \hline
+    Join & Matrix(500, 300) & Matrix(300, 500) \\ \hline
+    Geometry& \shortstack[l]{Matrix(300, 500), \\60K geometries} &  \shortstack[l]{Matrix(128, 60000), \\60K geometries} \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:typequery-stats}
+\end{center}   
+\end{table}
+
+Given the {\bf All Mapping}, {\bf Identity Mapping}, {\bf LinCom Mapping}, {\bf Expansion Mapping}, {\bf Collapse Mapping}, {\bf Join Mapping}
+only involves trivial computation, queries with key size from 1 to 10K show latency under 200~ms which is generally the Spark operating latency. 
+These queries show performance degradation with 100K keys (generally around 1~second). 
+From 100K key size, the query turnaround time increase proportionally with the key size as shown with the 1M key performance.
+{\bf Geometry Mapping} shows a consistent turnaround time under 200~ms from 1 to 1K key size. 
+Beyond that, query with 10K keys takes $2.41\pm0.6$~seconds and query with 1M keys take $132.9\pm0.4$~seconds
+
+This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of single transformer. 
+In the chained lineage cases, an individual element query can return a large number of coordinates, e.g., on the order of 1M. 
+The subsequent query with this 1M coordinates can then incur latency on the order of seconds, which quick accumulates the
+overall turnaround time higher than the 10~second boundary mentioned in ~\S\ref{sec:Req-Perf}. 
+This is a problem for end-to-end pipeline lineage investigation, e.g., verifying intermediate data removal safety property~\ref{sec:formal-skipping}.
+One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm 0.05$ for forward query.
+While in the case of SIFTFisher pipeline,  it can take an estimated $O(10^3)$~seconds to finish as the backward query on the SIFTExtractor
+transformer has a key size of 7.7M from a matrix with 128 rows and 60K columns to an image with 333 rows, 500 columns and 3 channels. 
+For the moment, we put this large scale query optimization as future work.
 
 \subsection{Use Case}
 In the {\bf code validation} case, users instrument the SIFTFisher pipeline by only recording the metadata mapping of the SIFTExtractor transformer.
