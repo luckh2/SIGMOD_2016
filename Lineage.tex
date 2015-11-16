@@ -305,10 +305,10 @@ Either through mathematical analysis or human intervention, they are able to val
 \label{sec:Back-Case-Cleaning}
 Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
 A user of the SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, observes a low prediction accuracy for a category of images, especially 
-when people and dogs are in the same image. A natural investigation is then to remove the images with both people and dogs,
+when cats and dogs are in the same image. A natural investigation is then to remove the images with both cats and dogs,
 and test if that improves prediction accuracy.
 
-Without lineage information, the user has to remove the according images from the training set and reruns data
+Without lineage information, the user has to remove the according images from the training set and rerun data
 preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
 With lineage information, the user can intercept the pipeline by loading the output of RowNormalizer directly into KeystoneML,
 filter out the data items that are derived from the images that have people and dogs together , and apply the filtered dataset directly to the linear solver.
@@ -1100,6 +1100,8 @@ This is because the SIFTFisher performance is memory-bounded on 8 machines, once
 exceeds the expectation.
 
 \subsection{Query Performance}
+
+
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/TypeQuery-Time}
@@ -1127,11 +1129,12 @@ In the {\bf data cleaning} use case, the user of the SIFTFisher pipeline want to
 he sees such a combination results in lower detection accuracy for the human category .
 So he instruments pipeline collecting all metadata mappings and the output datasets for NormalizeRows transformer. 
 Upon removal, he first joins the output dataset of NormalizeRows (a RDD of vectors) transformer with the labels.
-Then he filters out the corresponding vectors with both human and table in it. 
+Then he filters out the corresponding vectors with both cats and dogs in it ( eight vectors corresponding to eight images in this case). 
 From here, he can try retrain the model with the cleaned dataset. 
 This particular instrumentation introduces a performance penalty of 46.8\%, and the removal takes $25.7\pm0.27$ seconds.
 Comparing to the case of rerunning the data preparation phase of the pipeline, using lineage information speeds up the turnaround
-time by 16.4x. Further, to confirm the correctness of the removal, the users can query the lineage backward to find corresponding 
+time by 16.4x (from $421.3\pm3.8$~seconds to $25.7\pm0.3$~seconds). 
+Further, to confirm the safety of the removal, the users can query the lineage backward to find corresponding 
 images and conduct a verification.
 
 \section{Related Work}
