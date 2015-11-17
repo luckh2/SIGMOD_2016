@@ -225,6 +225,21 @@ In summary, we make the following contributions:
 \item{} We present three real use cases of using fine-grained data lineage for code validation, results inspection, and data cleaning, respectively.
 \end{shortlist}
 
+\section{Functional Requirements}
+\label{sec:functional}
+Two basic functions of SystemX is lineage capturing and serving.
+SystemX requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
+collect lineage information and customize instrumentation (deciding what dataset to store). 
+This interface should be concise with a few variations and options.
+This interface should also be powerful in terms of coverage of transformers.
+This interface should be flexible so that users can define their own lineage and instrumentation.
+
+To serve lineage for query, SystemX requires a user interface to reconstruct and chain collected lineage.
+Each transformer should provide the forward query (qForward()) and backward query (qBackward()) functionality.
+SystemX needs to verify the chained lineage has identical ordering to the pipeline.
+The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
+the lineage contains enough information with which users can reproduce the results.
+In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
 
 \section{Use Cases and K\MakeLowercase{eystone}ML}
 \label{sec:Background}
@@ -301,21 +316,6 @@ In principle, SystemX is general for distributed ML frameworks whose programming
 We integrate SystemX with KeystoneML to show the effectiveness of the design.
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
-\section{Functional Requirements}
-\label{sec:functional}
-Two basic functions of SystemX is lineage capturing and serving.
-SystemX requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
-collect lineage information and customize instrumentation (deciding what dataset to store). 
-This interface should be concise with a few variations and options.
-This interface should also be powerful in terms of coverage of transformers.
-This interface should be flexible so that users can define their own lineage and instrumentation.
-
-To serve lineage for query, SystemX requires a user interface to reconstruct and chain collected lineage.
-Each transformer should provide the forward query (qForward()) and backward query (qBackward()) functionality.
-SystemX needs to verify the chained lineage has identical ordering to the pipeline.
-The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
-the lineage contains enough information with which users can reproduce the results.
-In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
 
 \section{Formal Discussion}
 \label{sec:Mapping}
@@ -1140,7 +1140,7 @@ images and conduct a verification.
 
 \section{Related Work}
 \label{sec:Related}
-Researchers have extensively studied data lineage (in some cases referred as data provenance) for various purposes.
+{\bf Coarse-grained Lineage:} Researchers have extensively studied data lineage (in some cases referred as data provenance) for various purposes.
 For scientific workflow systems such as  Chimera~\cite{foster02}, Taverna~\cite{oinn02}, and ESSW~\cite{frew01}, 
 collects coarse-grained lineage of file metadata and according computation. 
 Similar work has been well summarized by survey~\cite{simmhan05, freire08, bose05}
@@ -1148,7 +1148,7 @@ Recent work~\cite{altintas10} investigates how to integrate the lineage of workf
 in a collaborative environment. Coarse-grained lineage is useful in these systems to trace the data and code dependencies.
 Since the lineage collected is coarse-grained, it is not sufficient for cell level diagnosis of ML pipelines.
 
-Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
+{\bf Fine-grained Lineage:} Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
 data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
 Recent works of RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} collects fine-grained lineage for the MapReduce
 systems. SubZero~\cite{wu13} proposes a prototype lineage system for array-based database system SciDB~\cite{brown10}.
@@ -1165,7 +1165,7 @@ One of SubZero's contributions is the region lineage that collects fine-grained 
 However, region lineage is not sufficient for ML pipelines because it only captures many to one relationships between input and output cells, 
 while SystemX can support many to many relationships as well.
 
-Researchers also have tried to collect fine-grained lineage with other approaches.
+{\bf Other Fine-grained Lineage Capturing Techniques:} Researchers also have tried to collect fine-grained lineage with other approaches.
 Weak inversion and verification methods~\cite{woodruff97} are proposed to support approximate lineage collection.
 Dynamic program analysis is employed to capture fine-grained lineage inside non-relational operators~\cite{zhang07} with 
 a 7.5$\sim$39.8x slowdown comparing the original program. 
