@@ -83,13 +83,12 @@
 
 \title{SystemL: Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
 
-\numberofauthors{1} 
-\author{
-% 1st. author
-\alignauthor Zhao~Zhang, Evan~R.~Sparks, Michael~J.~Franklin \\\
-       \affaddr{AMPLab, University of California, Berkeley}\\
-       \email{\{zhaozhang, sparks, franklin\}@cs.berkeley.edu} 
-}
+%\numberofauthors{1} 
+%\author{
+%\alignauthor Zhao~Zhang, Evan~R.~Sparks, Michael~J.~Franklin \\\
+%       \affaddr{AMPLab, University of California, Berkeley}\\
+%       \email{\{zhaozhang, sparks, franklin\}@cs.berkeley.edu} 
+%}
 
 \maketitle
 
@@ -119,7 +118,8 @@ is a single-computer-based framework while TensorFlow~\cite{tensorflow15}, Apach
 SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
 In practice, to obtain a working model, users often need to try a number of options (e.g. featurization, training parameters, and datasets). 
 When experimenting with these options, users frequently analyze results together with the corresponding input data,  
-locate the code segment for unexpected outcome, and rerun the computation with the removal of suspicious data anomalies.
+locate the code segment for unexpected outcome, and rerun the computation with the removal of suspicious data anomalies
+identified as bad by domain experts due to measurement error.
 Commonly, they use a case-by-case solution to record necessary information and store such information in persistent storage for examination.
 These solutions are often use case specific, performance degradation prone, and they can complicate code
 management due to the demand for multiple versions of a pipeline.
@@ -138,22 +138,28 @@ collect fine-grained lineage with a minimal performance penalty, and serve the i
 
 %answer sophisticated lineage query responsively( with query latency lower than 10~seconds~\cite{nielsen2009}).
 Lineage tracking has been investigated in various areas.
-Existing lineage tracking system such as Chimera~\cite{foster02} and and Taverna~\cite{oinn02} can collect coarse-grained lineage of scientific workflow systems.
-The weak inversion method~\cite{woodruff97} for RDBMS was proposed for queries that can tolerate inaccurate lineage information.
+Existing lineage tracking system such as Chimera~\cite{foster02} and and Taverna~\cite{oinn02} can collect coarse-grained lineage 
+of files and computations for scientific workflow systems.
+The weak inversion and verification methods~\cite{woodruff97} for RDBMS-based visualization system 
+was proposed for queries that can tolerate inaccurate fine-grained lineage information.
+Data warehouse fine-grained lineage capturing and serving is enabled by works~\cite{cui00, cui03}.
 Trio~\cite{widom04} tracks lineage for the RDBMS with cell mappings materialization at the same time of view queries.
-Recent work in fine-grained lineage capturing such as GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} presents
+Works in fine-grained lineage capturing such as GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} presents
 solutions for MapReduce systems, and capture lineage on low level operators such as mappers and reducers.
 SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineage capturing interface at operators and UDFs.
 
-Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks for two reasons.
-First, the lineage information collected by scientific workflow systems (e.g., Chimera) and the weak inversion method is not sufficient for accurate ML pipeline diagnosis.
-Second, the lineage capturing interface of Trio, GMRW, Newt, and SubZero is designed with a bottom-up approach
-that operates on the underlying system operators (e.g., mappers and reducers in MapReduce systems, UDFs in SciDB). 
-This approach is general for all workloads running on the system, but it only gives users very limited flexibility for customized
-instrumentation (specification of lineage type and the data to be collected) in the case when users know the exact data to collect.
+Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks for three reasons.
+First, the lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level lineage tracing and query.
+Second, the weak inversion and verification methods relax lineage accuracy thus can not provide accurate lineage information for ML pipeline diagnosis.
+Third, the lineage capturing interface of Trio, GMRW, Newt, and SubZero is designed by at
+the underlying system operators (e.g., SQL operators for RDMBS, aggregate-select-project-join operators in data warehouse, 
+mappers and reducers in MapReduce systems, and the pre-defined operators and UDFs in SciDB). 
+This approach is general for all workloads running on the system and completely transparent to users, 
+thus it gives users very limited flexibility for customized instrumentation (specification of lineage type and the data to be collected) 
+in the case when users know the exact data to collect.
 
-In this work, we use a top-down approach to design the lineage capturing interface that returns declaration and instrumentation
-flexibility to users. By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
+In this work, we present a lineage capturing interface that returns declaration and instrumentation flexibility to users. 
+By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
 (Figure~\ref{fig:conceptual} shows an conceptual illustration), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional spaces along one dimension at a time, 
 resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
@@ -187,7 +193,7 @@ We present SystemL, a lineage collecting and serving system that implements the 
 SystemL is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
 SystemL interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
 SystemL exploits the  data structure metadata (e.g., the size of each dimension of a space) for mapping recording to reduce storage overhead.
-It also uses a high order function approach and spatial index for geometry mapping which does not have a regular mapping pattern.
+It also uses a high-order function approach and spatial index for geometry mapping which does not have a regular mapping pattern.
 SystemL collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
 along with the computation and the optional model.
 SystemL stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
@@ -430,7 +436,7 @@ A sequence of data transformations ($s = {f_1, f_2, ..., f_n}$) is distributive 
 The mapping function {\bf Func} contains the core information of the input and output element dependency.
 Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-dimensional vectors in the case
 of every output element depends on every input element. 
-To eliminate this space burst, we identify seven primitive mapping functions.
+To eliminate this polynomial explosion in space requirements, we identify seven primitive mapping functions.
 From higher dimension space to lower dimension space, the mapping can be {\bf collapse} or {\bf expansion}.
 Between the equal dimension spaces, the mapping can be {\bf identity}, {\bf all}, {\bf geometry}, {\bf lincom}, and {\bf join}.
 Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with the mapping highlighted with color scheme.
@@ -539,7 +545,7 @@ In turn, a partial pipeline assembled by a sequence of transformers of the origi
 \label{sec:Req-Perf}
 In general, as lineage capturing incurs additional computation and I/O for mapping materialization and storage, a non-trivial performance
 penalty based on the original workload is expected. 
-Table~\ref{tb:overhead} circulates documented performance penalty introduced by lineage capturing in recent works. 
+Table~\ref{tb:overhead} summarizes documented performance penalty introduced by lineage capturing in recent works. 
 
 \begin{table}[ht]
 \begin{center}
@@ -679,8 +685,8 @@ Since many softwares such as SIFT and SourceExtractor already return the geograp
 SystemL exposes a simple interface for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
-Using the high order function involves an issue for query. 
-As both the input elements and output elements are encoded with a high order function. 
+Using the high-order function involves an issue for query. 
+As both the input elements and output elements are encoded with a high-order function. 
 And the mapping between input function and output function is stored in a list. 
 A query that takes an output element as key thus needs to iterate over all input functions and test if the key is in the function or not.
 If the key is in an input function, it then returns the mapping output function, and expands the function to a group of coordinates.
@@ -754,7 +760,7 @@ For transformer, model and other parameters, SystemL wraps each of them into an 
 
 \subsection{Geometry Mapping Index}
 \label{sec:GeometryIndex}
-In \S\ref{sec:Design-GeometryMapping}, we introduced the notion of geometry mapping and how we use high order function
+In \S\ref{sec:Design-GeometryMapping}, we introduced the notion of geometry mapping and how we use high-order function
 to describe the geometry for less storage space. 
 We also present that query of such geometry mapping can be slow due to the encoding. 
 In this section, we discuss four indexing strategies to speedup the query over the geometry mapping. 
@@ -923,9 +929,9 @@ CDH4 distribution of Hadoop.
 
 \subsection{Geometry Mapping Index}
 \label{sec:Perf-Index}
-With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:GeometrieIndex}.
+With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:GeometryIndex}.
 We use a workload with 5,000 pairs of input and output matrix, with each pair producing 60,000 geometry mappings that are uniformly distributed
-in 2D space. The total number of mappings capture is 300 million. The experiment was executed on a 16 node cluster.
+in 2D space. The total number of mappings has 300 million geometries. The experiment was executed on a 16 machine cluster.
 
 Figure~\ref{fig:sift-time} presents the end-to-end performance of this workload with a detailed runtime decomposition. For each data point, 
 we run it three times and present the average. 
@@ -1154,7 +1160,7 @@ It can be applied in the training process analysis to infer the contribution of 
 To enable accurate, flexible, low-overhead lineage collection and responsive lineage query, we present the SystemL lineage system.
 SystemL exposes a concise yet powerful lineage capturing interface for users by formulating the ML pipeline lineage as a sequence
 of multi-dimensional space transformations. The proposed interface has a coverage of 87\% of the transformers and estimators
-in the current KeystoneML code base. Combining the metadata of data structures, the high order function approach and spatial indexing
+in the current KeystoneML code base. Combining the metadata of data structures, the high-order function approach and spatial indexing
 strategy, SystemL is able to answer typical query within $\sim$100~ms and $\sim$1~second. Practically, SystemL introduces a
 performance penalty of 16\%-54\% depending on the pipeline and use case.
 
