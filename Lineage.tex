@@ -1104,7 +1104,7 @@ From 100K key size, the query turnaround time increases proportionally with the 
 Beyond that, query with 10K keys takes $2.41\pm0.6$~seconds and query with 1M keys take $132.9\pm0.4$~seconds
 
 This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of a single transformer. 
-However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~second boundary mentioned in ~\S\ref{sec:Req-Perf}. 
+However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~seconds boundary mentioned in ~\S\ref{sec:Req}. 
 This is a problem for end-to-end pipeline lineage investigation, e.g., verifying intermediate data removal safety property~\ref{sec:formal-skipping}.
 One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm 0.05$ for forward query.
 While in the case of SIFTFisher pipeline,  it can take an estimated $O(10^3)$~seconds to finish as the backward query on the SIFTExtractor
@@ -1123,7 +1123,8 @@ datasets of the last step. By joining the metadata mapping with output datasets,
 objects with a threshold brightness. Then query the metadata mapping to find the positions of corresponding pixels in the input images.
 This instrumentation introduces a performance penalty of 40.8\% on a 8 machine cluster. 
 Filtering luminous flux $>300,000$~lumen over 1 million objects returns 10,283 objects
-with its corresponding pixel positions in $1.84\pm0.14$~seconds.
+with its corresponding pixel positions in $1.84\pm0.14$~seconds. 
+A forward query that traces the error propagation given a bad pixel takes $3.3\pm0.03$~seconds to return.
 
 In the {\bf data cleaning} use case, the user of the SIFTFisher pipeline want to remove the training images that has both the human and table as
 he sees such a combination results in lower detection accuracy for the human category .
