@@ -107,7 +107,7 @@ The performance penalty introduced by SystemL is 16\%-54\% depending on the pipe
 \end{abstract}
 
 % A category with the (minimum) three required fields
-\category{Scalable Data Analysis}{System for Data Management}[Big Data]
+\category{Data management systems}{Database design and models}{Data model extensions}[Data provenance]
 %\keywords{ACM proceedings, \LaTeX, text tagging}
 
 \section{Introduction}
@@ -182,38 +182,6 @@ A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 \end{center}
 \end{figure}
 
-
-%Diagnosing such an ML pipeline with datasets in a distributed environment can be problematic due to
-%the lack of system support of memory states capturing and user interaction.
-%To motivate, we present three typical use cases for ML pipeline diagnostics:
-%\begin{shortlist}
-%\item{\bf Code Validation}: In an image classification pipeline, a user wants to verify the correctness of 
-%the positional information of features. 
-%\item{\bf Results Inspection}: In an astronomical object extraction pipeline, an astronomer wants to find objects whose
-%brightness are above a threshold then locate them in the input images.
-%\item{\bf Data Cleaning}: In an image classification pipeline, a user observes a particular category has
-%a low prediction accuracy, so he wants to remove the training samples of this category and retrain
-%the model.
-%\end{shortlist}
-
-%The astronomer of the {\bf Results Inspection}
-%case can first filter the results and find these objects that are above the brightness threshold, then query the lineage
-%backward to find out the input pixels. With further mathematical analysis or visualization, the astronomer can tell
-%if it is an object or an false detection introduced by cosmic ray. 
-%The user of the {\bf Data Cleaning} case can trace the propagation of the images through the pipeline right before
-%the featurized dataset is fed into training. He then can remove the corresponding data items that are derived from
-%the low-accuracy category and replay the training process withe the clean data without repeating the whole pipeline.
-
-
-
-%The performance penalty introduced by lineage capturing comes mostly from persisting in-memory data to storage.
-%In the context of data transformation, there are three potential datasets: the input, the output, and mapping between them.
-%Recording only the metadata (coordinates) mapping rather than the actual data value places a lower bound of the amount
-%of data the lineage system needs to capture. The actual dataset can be derived by rerunning the pipeline.
-%Among the mapping types, geometry mapping takes more storage space than others due to the arbitrary between two collections
-%of metadata. We introduce an high-order function approach to describe each geometry and record the mapping between
-%each pair of geometries to reduce the storage consumption. We also investigate various indexing strategies for better
-%query performance for geometry mapping.
 
 We present SystemL, a lineage collecting and serving system that implements the above general solutions.
 SystemL is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
