@@ -81,7 +81,7 @@
 
 \begin{document}
 
-\title{SystemL: Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
+\title{Diagnosing Machine Learning Pipelines with Fine-grained Lineage}
 
 %\numberofauthors{1} 
 %\author{
@@ -1016,8 +1016,8 @@ For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (
     Baseline & 780.8s & 279.7s & 56.4s \\ \hline
     Perf Penalty & 38.4\% & 25.6\% & 62.2\%   \\ \hline
     Memory & 38.5\% & 43.7\% & 200\%\\ \hline
-    Meta Space & 109.9~GB & 204.4~MB & 78.9~MB \\ \hline
-    Data Space & 615.7~GB & 506.9~GB & 11.8~GB\\ \hline
+    Mapping Size & 109.9~GB & 204.4~MB & 78.9~MB \\ \hline
+    In\&Out dataset Size & 615.7~GB & 506.9~GB & 11.8~GB\\ \hline
     \end{tabular}
     \end{scriptsize}
     \label{tb:apps-overhead}
@@ -1051,7 +1051,14 @@ This is because the SIFTFisher performance is memory-bounded on 8 machines, once
 exceeds the expectation.
 
 \subsection{Query Performance}
-To understand the query performance and scalability of each lineage type, we run queries with a varying size of keys
+In some cases, a user is only interested in one element of a single transformer.
+The query is then in the form of random query with a single key.
+While inn the chained lineage case, an individual element query on a transformer can return a large number of coordinates, e.g., on the order of 1M. 
+The subsequent query then uses these 1M coordinates as keys.
+And this large number of key size can impact the query performance substantially.  
+This performance measurement seeks to profile the boundary of query scalability in SystemL. 
+
+We run queries with a varying size of keys
 and present the performance in Figure~\ref{fig:typequery}. For each lineage type, we use a distributed collection (RDD) of 5,000 pairs of 
 input and output data structures (vector, matrix, image) and distribute them into 200 partitions over 16 machines.
 Table~\ref{tb:typequery-stats} shows the metadata settings of the input and output data structure in each query
@@ -1088,14 +1095,12 @@ Table~\ref{tb:typequery-stats} shows the metadata settings of the input and outp
 Given the {\bf All Mapping}, {\bf Identity Mapping}, {\bf LinCom Mapping}, {\bf Expansion Mapping}, {\bf Collapse Mapping}, {\bf Join Mapping}
 only involves trivial computation, queries with key size from 1 to 10K show latency under 200~ms which is generally the Spark operating latency. 
 These queries show performance degradation with 100K keys (generally around 1~second). 
-From 100K key size, the query turnaround time increase proportionally with the key size as shown with the 1M key performance.
+From 100K key size, the query turnaround time increases proportionally with the key size as shown with the 1M key performance.
 {\bf Geometry Mapping} shows a consistent turnaround time under 200~ms from 1 to 1K key size. 
 Beyond that, query with 10K keys takes $2.41\pm0.6$~seconds and query with 1M keys take $132.9\pm0.4$~seconds
 
-This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of single transformer. 
-In the chained lineage cases, an individual element query can return a large number of coordinates, e.g., on the order of 1M. 
-The subsequent query with this 1M coordinates can then incur latency on the order of seconds, which quick accumulates the
-overall turnaround time higher than the 10~second boundary mentioned in ~\S\ref{sec:Req-Perf}. 
+This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of a single transformer. 
+However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~second boundary mentioned in ~\S\ref{sec:Req-Perf}. 
 This is a problem for end-to-end pipeline lineage investigation, e.g., verifying intermediate data removal safety property~\ref{sec:formal-skipping}.
 One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm 0.05$ for forward query.
 While in the case of SIFTFisher pipeline,  it can take an estimated $O(10^3)$~seconds to finish as the backward query on the SIFTExtractor
@@ -1140,11 +1145,11 @@ Since the lineage collected is coarse-grained, it is not sufficient for cell lev
 
 Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
 data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
-Recent works of RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} collects fine-grained lineage for the mapreduce
+Recent works of RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} collects fine-grained lineage for the MapReduce
 systems. SubZero~\cite{wu13} proposes a prototype lineage system for array-based database system SciDB~\cite{brown10}.
 All these systems employ a bottom-up approach to design lineage capturing interface as the underlying systems all have well regulated low level operators.
 For example, the data warehouse has the aggregate, select, project, join operators. 
-RDMBS has its SQL operators. Mapreduce systems formulates the computation as mappers and reducers.
+RDMBS has its SQL operators. MapReduce systems formulates the computation as mappers and reducers.
 The curated database defines four operators of insert, delete, copy and paste.
 One of SubZero's contributions is the region lineage that collects fine-grained lineage for UDFs besides the built-in operators in SciDB. 
 In contrast, an ML pipeline can be viewed as a chain of user-defined data transformations, and the users often have the knowledge 
