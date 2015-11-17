@@ -12,7 +12,7 @@
 % This .tex file (and associated .cls V2.5) produces:
 %       1) The Permission Statement
 %       2) The Conference (location) Info information
-%       3) The Copyright Line with ACM data
+%       3) The Copyright Line with ACM data-intensive
 %       4) NO page numbers
 %
 % as against the acm_proc_article-sp.cls file which
@@ -93,16 +93,16 @@
 \maketitle
 
 \begin{abstract}
-We present the SystemL lineage system to enable the diagnosis of distributed machine learning (ML) pipelines by leveraging the fine-grained
+We present the SystemX lineage system to enable the diagnosis of distributed machine learning (ML) pipelines by leveraging the fine-grained
 data lineage.  
-SystemL exposes a concise yet powerful API, derived from \emph{primitive lineage types}, and collects fine-grained data lineage for each 
+SystemX exposes a concise yet powerful API, derived from \emph{primitive lineage types}, and collects fine-grained data lineage for each 
 data transformation by recording the input datasets, the output datasets and the mapping between them, along
 with all information needed to reproduce the computation.
-SystemL efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
-For a single transformation, SystemL's high-order function mapping strategy can reduce the storage consumption by up to 
+SystemX efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
+For a single transformation, SystemX's high-order function mapping strategy can reduce the storage consumption by up to 
 45x comparing to the element-wise mapping recording.
-The spatial index allows SystemL to speed up query performance by a further 2x-31x. 
-The performance penalty introduced by SystemL is 16\%-54\% depending on the pipeline and use case.
+The spatial index allows SystemX to speed up query performance by a further 2x-31x. 
+The performance penalty introduced by SystemX is 16\%-54\% depending on the pipeline and use case.
 \end{abstract}
 
 % A category with the (minimum) three required fields
@@ -189,30 +189,30 @@ A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 \end{figure}
 
 
-We present SystemL, a lineage collecting and serving system that implements the above general solutions.
-SystemL is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
-SystemL interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
-SystemL exploits the  data structure metadata (e.g., the size of each dimension of a space) for mapping recording to reduce storage overhead.
+We present SystemX, a lineage collecting and serving system that implements the above general solutions.
+SystemX is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
+SystemX interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
+SystemX exploits the  data structure metadata (e.g., the size of each dimension of a space) for mapping recording to reduce storage overhead.
 It also uses a high-order function approach and spatial index for geometry mapping which does not have a regular mapping pattern.
-SystemL collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
+SystemX collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
 along with the computation and the optional model.
-SystemL stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
+SystemX stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
 of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
 Unlike Spark lineage, which tracks partition level data dependency and associated computation for internal system resilience,
-SystemL tracks lineage with a finer granularity at the cell level of data structures.
-In addition, SystemL exposes an interface for users to specify lineage types and query.
-When queried, SystemL can load the lineage information from storage and reconstruct the lineage chain.
+SystemX tracks lineage with a finer granularity at the cell level of data structures.
+In addition, SystemX exposes an interface for users to specify lineage types and query.
+When queried, SystemX can load the lineage information from storage and reconstruct the lineage chain.
 Users have the flexibility to reconstruct a single transformer lineage, a partial chain, or the whole chain.
 
-SystemL enables lineage-based ML pipeline diagnostics such as code validation, results inspection, and data cleaning.
+SystemX enables lineage-based ML pipeline diagnostics such as code validation, results inspection, and data cleaning.
 A detailed discussion of these three use cases is presented in \S\ref{sec:Back-cases}.
 Versus a time-efficient but space-inefficient strategy of materializing cel-wise mapping, 
-SystemL's techniques (spatial index + high-order function geometry) enable 2x-31x speedups at lineage query time.
+SystemX's techniques (spatial index + high-order function geometry) enable 2x-31x speedups at lineage query time.
 While this new capability comes at the cost of performance overhead during pipeline training/execution.
 The overhead is measured in wall clock time increase, memory consumption, and storage space.
 For the three use cases, the wall clock time overhead is 16\%-54\%, which is comparable to other distributed lineage systems
 such as the Hadoop~\cite{HADOOP}-based RAMP~\cite{ikeda11, park11} (16\%-76\% as reported)  and Newt~\cite{logothetis13} (20\%-50\% as reported).
-SystemL increases memory usage by 31\%-79\%,
+SystemX increases memory usage by 31\%-79\%,
 and the storage space for lineage information varies case by case from $\sim$100~MB to $\sim$1~TB.
 
 
@@ -227,7 +227,7 @@ In summary, we make the following contributions:
 
 \section{Use Cases and K\MakeLowercase{eystone}ML}
 \label{sec:Background}
-In this section, we present three motivating use cases of SystemL and briefly review KeystoneML.
+In this section, we present three motivating use cases of SystemX and briefly review KeystoneML.
 
 \subsection{Use Cases}
 \label{sec:Back-cases}
@@ -285,7 +285,7 @@ The ML expert who is building a SIFTFisher pipeline, shown in Figure~\ref{fig:vo
 training data items due to measurement error (e.g. the images that have both dogs and cats). A natural 
 investigation is then to remove these images, and test if that improves prediction accuracy.
 
-With SystemL, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
+With SystemX, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
 directly into KeystoneML, filter out the data items that are derived from the images with both dogs and cats , 
 and apply the filtered dataset directly to the linear solver.
 In this way, the rerunning process can bypass the expensive data preparation procedure (from PixelScaler to RowNormalizer) 
@@ -535,19 +535,19 @@ For the mappings that are not covered by the primitive functions, we allow users
 
 \section{Design Goals}
 \label{sec:Req}
-In this section, we present the design goals of SystemL from the functional and performance perspective.
+In this section, we present the design goals of SystemX from the functional and performance perspective.
 
 \subsection{Functional Requirements}
-Two basic functions of SystemL is lineage capturing and serving.
-SystemL requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
+Two basic functions of SystemX is lineage capturing and serving.
+SystemX requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
 collect lineage information and customize instrumentation (deciding what dataset to store). 
 This interface should be concise with a few variations and options.
 This interface should also be powerful in terms of coverage of transformers.
 This interface should be flexible so that users can define their own lineage and instrumentation.
 
-To serve lineage for query, SystemL requires a user interface to reconstruct and chain collected lineage.
+To serve lineage for query, SystemX requires a user interface to reconstruct and chain collected lineage.
 Each transformer should provide the forward query (qForward()) and backward query (qBackward()) functionality.
-SystemL needs to verify the chained lineage has identical ordering to the pipeline.
+SystemX needs to verify the chained lineage has identical ordering to the pipeline.
 The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
 the lineage contains enough information with which users can reproduce the results.
 In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
@@ -556,11 +556,11 @@ In turn, a partial pipeline assembled by a sequence of transformers of the origi
 \label{sec:Req-Perf}
 In general, as lineage capturing incurs additional computation and I/O for mapping materialization and storage, a non-trivial performance
 penalty based on the original workload is expected. 
-Table~\ref{tb:overhead} summarizes reported performance penalty introduced by lineage capturing in existing systems and SystemL. 
+Table~\ref{tb:overhead} summarizes reported performance penalty introduced by lineage capturing in existing systems and SystemX. 
 
 \begin{table}[ht]
 \begin{center}
-    \caption{Performance Penalty Reported by Existing Lineage Systems and SystemL}
+    \caption{Performance Penalty Reported by Existing Lineage Systems and SystemX}
     \begin{scriptsize}
     \begin{tabular}{ | p{1.5cm} | p{3.5cm} | p{2cm} |}
     \hline
@@ -568,40 +568,40 @@ Table~\ref{tb:overhead} summarizes reported performance penalty introduced by li
     RAMP~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
     Newt~\cite{logothetis13} & Hadoop~\cite{HADOOP} & 20-50\% \\ \hline
     SubZero~\cite{wu13} & SciDB~\cite{brown10} & 50\%-150\% \\ \hline
-    SystemL & KeystoneML~\cite{sparks15}, Spark~\cite{zaharia12} & 16\%-54\% \\ \hline
+    SystemX & KeystoneML~\cite{sparks15}, Spark~\cite{zaharia12} & 16\%-54\% \\ \hline
     \end{tabular}
     \end{scriptsize}
     \label{tb:overhead}
 \end{center}   
 \end{table}
 
-This performance penalty problem exacerbates for SystemL, since KeystoneML's distributed computing engine Apache Spark 
+This performance penalty problem exacerbates for SystemX, since KeystoneML's distributed computing engine Apache Spark 
 optimizes for in-memory computing and do not write intermediate data to disks unless it is a shuffle operation. 
-Comparing to systems such as Hadoop, the same amount of I/O of SystemL will introduce a more significant penalty.
-Despite this obstacle, we expect SystemL's performance penalty to be comparable to the existing systems.
+Comparing to systems such as Hadoop, the same amount of I/O of SystemX will introduce a more significant penalty.
+Despite this obstacle, we expect SystemX's performance penalty to be comparable to the existing systems.
 
 Lineage information can be massive depending on the pipeline, since the input or the intermediate dataset of a pipeline can be large.
 In some transformers, the mapping between the input elements and output elements does not conform a pattern, e.g., Geometry mapping.
 We need advance technique to reduce the storage burst introduced by such mappings.
 
-Using SystemL for ML pipeline diagnosing requires a low-latency interaction between users and the lineage serving unit.
+Using SystemX for ML pipeline diagnosing requires a low-latency interaction between users and the lineage serving unit.
 As documented in the report~\cite{nielsen2009} in human computer interaction, 1~second latency is the boundary to keep users' thought flow while 10~seconds
 is the boundary to loose users' attention.
-We expect SystemL's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
+We expect SystemX's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
 
 \section{Design}
 \label{sec:Design}
-In this section, we discuss SystemL's layered design of lineage capturing and instrumentation interface, 
+In this section, we discuss SystemX's layered design of lineage capturing and instrumentation interface, 
 
 \subsection{Overview}
-Figure~\ref{fig:architecture} shows the overview of SystemL and its interactions with other components. 
+Figure~\ref{fig:architecture} shows the overview of SystemX and its interactions with other components. 
 Rounded-corner rectangles are components around and inside KeystoneML. 
 The two-sided arrows indicate interactions between components.
 Users compose machine learning pipelines with KeystoneML and submit the compiled DAG to Spark.
 All computation and I/O are done through the Spark Resilient Distributed Dataset (RDD) abstraction.
-With SystemL, users can declare and instrument lineage at the transformer level, 
+With SystemX, users can declare and instrument lineage at the transformer level, 
 so that the compiled DAG also contains lineage recording and other operations, e.g., save to disk.
-Lineage in SystemL is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
+Lineage in SystemX is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
 Users can load the stored lineage in HDFS to Spark interactive command line interface.
 By interacting using the query interface, users can query elements of interest, replay transformation, or analyze
 the lineage for other purposes.
@@ -609,7 +609,7 @@ the lineage for other purposes.
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/architecture}
-\caption {Overview of SystemL and its surrounding components.
+\caption {Overview of SystemX and its surrounding components.
     \label{fig:architecture}
 }
 \end{center}
@@ -617,7 +617,7 @@ the lineage for other purposes.
 
 \subsection{Lineage Interface}
 \label{sec:Design-Lineage}
-SystemL exposes the lineage capturing interface by naming the lineage type specific class with its mapping types between input and output datasets.
+SystemX exposes the lineage capturing interface by naming the lineage type specific class with its mapping types between input and output datasets.
 All the type specific class inherits an abstract class of Lineage, which define common methods shared among the type specific classes:
 \begin{shortlist}
 \item{} qForward(keys: List[Coor]): List[Coor], given a list of element metadata (coordinates) returns the forward query results on the metadata mapping of the lineage
@@ -649,12 +649,12 @@ Table~\ref{tb:lineage-interface} summarizes the lineage types and parameters pas
 \end{center}   
 \end{table}
 
-In general, SystemL lineage capturing interface can collect six types of data: 
+In general, SystemX lineage capturing interface can collect six types of data: 
 the input dataset (in), the output dataset (out), the transformer (transformer), 
 the collection of mapping (mappingCollection), the model (model), and the random 
 parameter (rand).
 
-By checking the input and output dataset, SystemL is able to figure out the metadata of each data structure then use
+By checking the input and output dataset, SystemX is able to figure out the metadata of each data structure then use
 it to declare the mapping objects, which is described in the following section.
 
 \subsection{Mapping}
@@ -663,7 +663,7 @@ Mapping on the abstract level provides two interfaces: qForward() and qBackward(
 take a list of element metadata (coordinates) and return the query results accordingly.
 
 For all mapping types presented in ~\S\ref{sec:Map-Func} except Geometry mapping, 
-SystemL infers metadata of data structures automatically. 
+SystemX infers metadata of data structures automatically. 
 For example in an All mapping between two matrices of 5 rows and 5 columns,
 the mapping is recorded as AllMapping(twoDMeta(5, 5), twoDMeta(5,5)). 
 So upon forward query, AllMapping returns the coordinates of all 25 elements in the output matrix by only looking into the matrix metadata.
@@ -674,7 +674,7 @@ We define three types of metadata to simplify the interface:
 \item{} twoDMeta: (Int, Int)
 \item{} threeDMeta: (Int, Int, Int)
 \end{shortlist}  
-SystemL also uses this data structure metadata to checkout out-of-bound errors if the given key is outside the space of the data structure.
+SystemX also uses this data structure metadata to checkout out-of-bound errors if the given key is outside the space of the data structure.
 
 For geometry mapping, the mapping is arbitrary and can not take benefit from data structure metadata, 
 Intuitively, users to pass the exact mapping in the form of a collection, inside which is a list of tuples, where each tuple 
@@ -689,12 +689,12 @@ As can be seen in the geometry mapping example in Figure~\ref{fig:narrowmapping}
 Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
 For SIFT, the input elements form a circle with a geographical center and the scale as its radius.
 Similarly, the SourceExtractor's input elements form an ellipse. 
-SystemL uses a high-order function to describe the geometry such as circle and ellipse. 
+SystemX uses a high-order function to describe the geometry such as circle and ellipse. 
 Thus the mapping between two geometries is expressed as a tuple of two higher-order functions.
 The space complexity goes down to O(1).
 
 Since many softwares such as SIFT and SourceExtractor already return the geographical information with the results.
-SystemL exposes a simple interface for two dimensional shapes as special cases.
+SystemX exposes a simple interface for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
 Using the high-order function involves an issue for query. 
@@ -714,7 +714,7 @@ This section discusses implementation details for lineage collection, I/O, and g
 \subsection{Metadata Separation}
 Capturing lineage and storing it introduces performance penalty compared to the lineage-free case. 
 One way to minimize this penalty is to store less data without sacrificing the integrity of the lineage information.
-As discussed in \S\ref{sec:formal-ds-mapping}, SystemL separates the metadata of a data structure from the 
+As discussed in \S\ref{sec:formal-ds-mapping}, SystemX separates the metadata of a data structure from the 
 actual data (e.g., the coordinates of elements in a matrix), and mandates metadata mapping while leaves
 the actual dataset storage an option for users.
 
@@ -747,27 +747,27 @@ Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the {\bf co
 map spaces that have different dimensions. By definition, they only maps from higher-dimensional space to lower-dimensional space.
 A transformer that reduces lower-dimensional space to higher-dimensional space, e.g., transforming a vector into a matrix, can use
 the same {\bf ExpansionLineage} type for declaration based on the fact that the reverse mapping of this transformation is a
-{\bf expansion mapping}. SystemL can infer the mapping direction based on the metadata of data structures 
+{\bf expansion mapping}. SystemX can infer the mapping direction based on the metadata of data structures 
 (the number and size of dimensions of a n-dimensional space). 
 A similar solution is used for the reverse of {\bf collapse mapping}.
 
-For sampling transformers, e.g., selecting a subset of a vector collection, SystemL implements it as a {\bf geometry mapping}.
+For sampling transformers, e.g., selecting a subset of a vector collection, SystemX implements it as a {\bf geometry mapping}.
 From the input side, there are a list of geometries (rectangles for vectors) with each pointing to an output geometry (a rectangle for a vector).
 
-In practice, we recommend users to define a transformer with one primitive mapping type to use SystemL and it is often the case since
+In practice, we recommend users to define a transformer with one primitive mapping type to use SystemX and it is often the case since
 we see 39 out of 45 transformers in the current KeystoneML code base are coded this way. 
 In meantime, we also looking into ways to declare complex data transformations by composing the primitive mapping types.
 
 
 \subsection{Lineage Storage}
-SystemL uses the RDD abstraction of Apache Spark for lineage information storage. 
-At a high level, SystemL creates a unique directory on the underlying file system with a naming pattern of 
+SystemX uses the RDD abstraction of Apache Spark for lineage information storage. 
+At a high level, SystemX creates a unique directory on the underlying file system with a naming pattern of 
 concatenating the transformer name and the initial input dataset identifier of the pipeline.
-In this way, SystemL can tell between the training pipeline and test pipeline based on the directory name
+In this way, SystemX can tell between the training pipeline and test pipeline based on the directory name
 if the training and testing are run in a single program given that the training and test datasets are distinct.
 
-For the datasets and mappings, SystemL write them to file system by calling {\it RDD.saveAsObjectFile(path)}.
-For transformer, model and other parameters, SystemL wraps each of them into an RDD then store them as object files.
+For the datasets and mappings, SystemX write them to file system by calling {\it RDD.saveAsObjectFile(path)}.
+For transformer, model and other parameters, SystemX wraps each of them into an RDD then store them as object files.
 
 
 \subsection{Geometry Mapping Index}
@@ -926,17 +926,17 @@ A detailed performance study is present in \S\ref{sec:Perf-Index}.
 
 \section{Evaluation}
 \label{sec:Perf}
-In this section, we present the performance measurements of SystemL from various aspects.
+In this section, we present the performance measurements of SystemX from various aspects.
 We demonstrate various built-in indexing strategy for geometry mapping, and profile the tradeoff
 between index building time, query performance, memory usage and storage consumption.
 We present the end-to-end performance and memory/disk usage for three real ML pipelins.
-Then we show the profiling of SystemL's scalability with three real ML pipelines on varying cluster sizes.
+Then we show the profiling of SystemX's scalability with three real ML pipelines on varying cluster sizes.
 Last, we measure the performance of the three use cases presented in \S\ref{sec:Back-cases} with 
 fine-grained lineage and its according cost.
 
 Unless otherwise specified, we run all experiments on Amazon EC2 using r3.8xlarge instances.
 Each machine has 16 physical cores, 244 GB memory, and two 320GB SSD. 
-SystemL is integrated with KeystoneML 0.3 which in turn runs over Spark 1.3.1, HDFS from the
+SystemX is integrated with KeystoneML 0.3 which in turn runs over Spark 1.3.1, HDFS from the
 CDH4 distribution of Hadoop. 
 
 \subsection{Geometry Mapping Index}
@@ -1008,7 +1008,7 @@ For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (
 
 \begin{table}[ht]
 \begin{center}
-    \caption{Overhead Profile of SystemL on the SIFTFisher, SourceExtractor, and MNIST Pipelines}
+    \caption{Overhead Profile of SystemX on the SIFTFisher, SourceExtractor, and MNIST Pipelines}
     \begin{scriptsize}
     \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | p{1.5cm} | }
     \hline
@@ -1034,18 +1034,18 @@ Then we decompose the running time for NoLineage, Meta, and Data, and show the r
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Scalability}
-\caption {Relative Speedup of the VOCSIFTFisher, Source Extractor, and MNIST Pipelines with SystemL over Eight Nodes.
+\caption {Relative Speedup of the VOCSIFTFisher, Source Extractor, and MNIST Pipelines with SystemX over Eight Nodes.
     \label{fig:scalability}
 }
 \end{center}
 \end{figure}
 
-One pattern we can conclude from the scalability measurements is that SystemL scales no worse than the ML pipelines.
-This is due to the fact that SystemL captures and stores the lineage information via the RDD abstraction, which perform
+One pattern we can conclude from the scalability measurements is that SystemX scales no worse than the ML pipelines.
+This is due to the fact that SystemX captures and stores the lineage information via the RDD abstraction, which perform
 in a scalable manner. 
 The metadata mapping capturing is more likely to be impacted by the ML pipeline comparing to the case where both metadata
 mapping and datasets are captured, since it is a relatively less data-intensive operations.
-Combining pipeline stats shown in Table~\ref{tb:apps-overhead}, SystemL scales  well when collecting larger datasets.
+Combining pipeline stats shown in Table~\ref{tb:apps-overhead}, SystemX scales  well when collecting larger datasets.
 In the SIFTFisher case, capturing both metadata mapping and datasets shows scalability that is higher than ideal.
 This is because the SIFTFisher performance is memory-bounded on 8 machines, once the memory bound is relieved, the actual performance
 exceeds the expectation.
@@ -1056,7 +1056,7 @@ The query is then in the form of random query with a single key.
 While inn the chained lineage case, an individual element query on a transformer can return a large number of coordinates, e.g., on the order of 1M. 
 The subsequent query then uses these 1M coordinates as keys.
 And this large number of key size can impact the query performance substantially.  
-This performance measurement seeks to profile the boundary of query scalability in SystemL. 
+This performance measurement seeks to profile the boundary of query scalability in SystemX. 
 
 We run queries with a varying size of keys
 and present the performance in Figure~\ref{fig:typequery}. For each lineage type, we use a distributed collection (RDD) of 5,000 pairs of 
@@ -1174,11 +1174,11 @@ It can be applied in the training process analysis to infer the contribution of 
 
 \section{Conclusion and Future Work}
 \label{sec:Conclusion}
-To enable accurate, flexible, low-overhead lineage collection and responsive lineage query, we present the SystemL lineage system.
-SystemL exposes a concise yet powerful lineage capturing interface for users by formulating the ML pipeline lineage as a sequence
+To enable accurate, flexible, low-overhead lineage collection and responsive lineage query, we present the SystemX lineage system.
+SystemX exposes a concise yet powerful lineage capturing interface for users by formulating the ML pipeline lineage as a sequence
 of multi-dimensional space transformations. The proposed interface has a coverage of 87\% of the transformers and estimators
 in the current KeystoneML code base. Combining the metadata of data structures, the high-order function approach and spatial indexing
-strategy, SystemL is able to answer typical query within $\sim$100~ms and $\sim$1~second. Practically, SystemL introduces a
+strategy, SystemX is able to answer typical query within $\sim$100~ms and $\sim$1~second. Practically, SystemX introduces a
 performance penalty of 16\%-54\% depending on the pipeline and use case.
 
 As future work, we are investigating the diagnosability of the training process in the estimator. We seek to provide the users with
