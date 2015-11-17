@@ -51,6 +51,8 @@
 \usepackage{multirow}
 \usepackage{listings}
 \usepackage{url}
+\usepackage{dblfloatfix}
+\usepackage{fixltx2e}
 \usepackage{listings}
 \lstset{language=sql, escapeinside={\$}, basicstyle=\footnotesize\ttfamily, mathescape, escapeinside={\%*}{*)}}
 
@@ -111,7 +113,7 @@ The performance penalty introduced by SystemX's lineage capturing is 16\%-54\% d
 
 \section{Introduction}
 Machine learning frameworks are increasingly popular as practitioners and researchers can quickly
-build applications (referred to as ML pipelines in the rest of this paper or pipelines in the rest of this paper) with a high-level 
+build applications (referred to as ML pipelines or pipelines in the rest of this paper) with a high-level 
 programming language to pipeline data preparation, feature extraction, model training, and prediction. 
 Among these systems, Scikit-learn~\cite{pedregosa2011scikit}
 is a single-computer-based framework while TensorFlow~\cite{tensorflow15}, Apache Mahout~\cite{owen2011mahout}, MLlib~\cite{meng2015mllib}, 
@@ -258,14 +260,14 @@ These users are constantly engineering new features, adding new datasources, and
 Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
 
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \begin{center}
-    \includegraphics[width=85mm]{pictures/VOCSIFTFisher}
+    \includegraphics[width=150mm]{pictures/VOCSIFTFisher}
     \caption {The SIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
     \label{fig:vocsiftfisher}
 }
 \end{center}
-\end{figure}
+\end{figure*}
 
 As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
 It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
@@ -278,7 +280,10 @@ By visualizing the features we could see that the new features added to our mode
 Users of ML pipelines often interpret the results, identify some potential data anomalies, then retrospect the supporting input data for better understanding.
 Fine-grained data lineage of ML pipelines have sufficient information for such investigation.
 
-\begin{figure}[t]
+One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
+that processes images from the telescopes and produces astronomical object catalogs. 
+
+\begin{figure}[ht]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SourceExtractor}
     \caption {The SourceExtractor pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
@@ -287,8 +292,6 @@ Fine-grained data lineage of ML pipelines have sufficient information for such i
 \end{center}
 \end{figure}
 
-One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
-that processes images from the telescopes and produces astronomical object catalogs. 
 The astronomical object catalog includes the position, shape, and other statistical properties of the object.
 In this case, astronomers find the bright objects over a threshold and validate that these objects are indeed astronomical objects rather
 than noise caused by cosmic rays.
@@ -1190,7 +1193,7 @@ SystemX exposes a concise yet powerful lineage capturing interface for users by 
 of multi-dimensional space transformations. The proposed interface has a coverage of 87\% of the transformers and estimators
 in the current KeystoneML code base. Combining the metadata of data structures, the high-order function approach and spatial indexing
 strategy, SystemX is able to answer typical query within 0.1-1~second. Practically, SystemX introduces a
-performance penalty of 16\%-54\% depending on the pipeline and use case.
+performance penalty of 16\%-54\% depending on the pipeline and use case which is comparable to other Hadoop-based lineage systems.
 
 As future work, we are investigating the diagnosability of the training process in the estimator. We seek to provide the users with
 the fine-grained lineage information inside an estimator to answer queries of supporting training samples for
