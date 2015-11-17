@@ -347,6 +347,7 @@ For queries, we present the definition of forward query and backward query can b
 the table order in the join operation.
 
 \subsection{Dataset and Mapping}
+\label{sec:formal-ds-mapping}
 Conceptually, the input dataset and output dataset can be defined
 as tables with each element's position in the data structure as key.
 In reality, such tables is in the form of a distributed collection such as RDD.
@@ -368,7 +369,7 @@ CREATE TABLE output
 (
   Meta (INT, INT),
   Value (DOUBLE)
-)
+);
 \end{verbatim}
 \end{minipage}
 \end{minipage}
@@ -381,7 +382,7 @@ It is a left outer join since an input element may not be corresponding to any o
 SELECT *
 From input
 LEFT OUTER JOIN output 
-    ON Fun(in.meta) $\ni$ out.meta
+    ON Fun(in.meta) $\ni$ out.meta;
 \end{lstlisting}
 
 In practice, we separate the metadata from the actual element values and only record metadata mapping.
@@ -390,14 +391,14 @@ INSERT INTO mapping (in_meta, out_meta)
 SELECT in.meta, out.meta
 From input
 LEFT OUTER JOIN output 
-    ON Fun(in.meta) $\ni$ out.meta
+    ON Fun(in.meta) $\ni$ out.meta;
 \end{lstlisting}
 The retrieval of actual element values can be obtained by joining the mapping table and the output dataset table.
 \begin{lstlisting}
 SELECT mapping.meta, out.value
 From mapping
 LEFT OUTER JOIN output 
-    ON mapping.out_meta = output.meta
+    ON mapping.out_meta = output.meta;
 \end{lstlisting}
 
 The input and output mapping of a pipeline is in turn a sequence of mappings of individual transformer.
@@ -410,14 +411,14 @@ A forward query with a key  ({\it qForward(key)}) over the mapping of a transfor
 \begin{lstlisting}
 SELECT out_meta
 FROM mapping
-WHERE key = in_meta
+WHERE key = in_meta;
 \end{lstlisting}
 
 A forward query with a list of $keys={k_1, k_2, ..., k_n}$ ({\it qForward(keys)}) can be expressed as:
 \begin{lstlisting}
 SELECT out_meta
 FROM mapping
-WHERE $k_1$ = in_meta OR ... OR $k_n$=in_meta
+WHERE $k_1$ = in_meta OR ... OR $k_n$=in_meta;
 \end{lstlisting}
 
 \subsection{Data Preparation Skipping}
@@ -711,7 +712,7 @@ SystemL exposes a simple interface for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
 Using the high order function involves an issue for query. 
-As both the input elements and output elements are encoded with a higher order function. 
+As both the input elements and output elements are encoded with a high order function. 
 And the mapping between input function and output function is stored in a list. 
 A query that takes an output element as key thus needs to iterate over all input functions and test if the key is in the function or not.
 If the key is in an input function, it then returns the mapping output function, and expands the function to a group of coordinates.
@@ -721,114 +722,77 @@ To speedup the query performance, we implement and compare several indexing stra
 
 \section{Implementations}
 \label{sec:Impl}
-\zhaonote{talk about how to infer low-high space reduction}
-\zhaonote{this section needs rewriting}
 
 This section discusses implementation details for lineage collection, I/O, and geometry mapping index.
 
 \subsection{Metadata Separation}
-\zhaonote{separating metadata from actual data and leaves it as user's option}
-As discussed in \S\ref{sec:Req-Perf}, writing lineage to persistent storage can introduce a more dramatical slowdown for KeystoneML comparing
-to the Hadoop-based systems, since Spark seeks to eliminate unnecessary I/O between memory and persistent storage.
-One effective way to reduce the I/O overhead is reduce the lineage data size.
+Capturing lineage and storing it introduces performance penalty compared to the lineage-free case. 
+One way to minimize this penalty is to store less data without sacrificing the integrity of the lineage information.
+As discussed in \S\ref{sec:formal-ds-mapping}, SystemL separates the metadata of a data structure from the 
+actual data (e.g., the coordinates of elements in a matrix), and mandates metadata mapping while leaves
+the actual dataset storage an option for users.
 
-SystemL reduces the lineage data size by 1) separating the metadata from the datasets, 2) tracking only the metadata mapping, 
-and 3) taking advantage of the mapping types specified by the user.
-
-In \S\ref{sec:Lin-Pipe-Data}, we say an element in a data structure has two properties: the coordinate and the value.
-We refer the coordinate as the metadata of a particular element and the value as the actual data. 
-In a backward query of an element throughout the whole pipeline, the query traverses from the last transformer
-to the very first transformer in a sequential manner. 
-We see that in the last the transformer and other transformers in the middle, the metadata mapping is sufficient to answer
-the query of depending input elements of given output elements. Only in the very first transformer do we need both the metadata
-to find the metadata of the depending input elements and the actual data of these elements.
-So SystemL separates the metadata from actual data and only tracks the metadata mapping.
+Storing only the metadata mapping can still preserve the lineage information integrity given that the intermediate and result 
+dataset can always be reproduced with the KeystoneML transformer given the its determinism property. 
+A profile study on the SIFTFisher, SourceExtractor and MNIST pipelines shows a space reduction by 
+13.7x (from 725.6~GB to 109.9~GB), 2480.9x (from 507.1G to 204.4M), and 150.8x (from 11.9~GB to 78.9~MB)
 
 \subsection{Mapping Inversion}
-Another lineage size reduction is contributed by user specified mapping types. 
-The {\bf One Mapping} and {\bf All Mapping} are the mapping types behind the OneLineage and AllLineage, respectively.
-Both the two mapping types are symmetric.
-In {\bf One Mapping} if an output element depends exactly on the input element with the same coordinate, 
-the input element value only propagates to that only output element. 
-Thus both the forward and backward query return the element that has the identical coordinate as the key.
-So is for {\bf All Mapping}, the dependency of all input elements to an output element indicates that every input element's value propagates to all output elements.
-Both the forward and backward query shall return all elements in the data structure.
-Thus for {\bf One Mapping} and {\bf All Mapping}, recording the metadata of the matrix is enough to answer the forward and backward query.
+When formulating the cell level mapping of a transformer as a multi-dimensional space transformation, we define
+the mapping in the direction from input to output and name the according lineage type with its mapping type.
+In this paragraph, we explain how to infer backward query (the mapping reverse) of the transformer.
+{\bf All mapping}, {\bf identity mapping}, {\bf lincom mapping}, and {join mapping} are symmetric, 
+meaning the reverse of these two mappings are also {\bf all mapping}, {\bf identity mapping}, 
+{\bf lincom mapping}, and {\bf join mapping} respectively.
 
-In contrast, the {\bf Geometry Mapping} and {\bf Sample Mapping} are asymmetric. 
-{\bf Sample Mapping} is implemented as a subtype of {\bf Geometry Mapping}, as it samples a random subset of the input data structure and return that subset as output.
-We can describe the subset as a list of random geometries (rectangles in column sampling of a matrix), with each input geometry maps to an output geometry.
-To record these two mapping types, metadata of data structures is not sufficient to answer the queries. 
-SystemL needs to record geometry level mappings instead.
+{\bf Collapse mapping} and {\bf expansion mapping} are not symmetric, but the mapping inversion can be inferred
+given the data structure metadata (the number and size of dimensions of a n-dimensional space). For example, 
+in the collapse case shown early in Figure~\ref{fig:narrowmapping}, a matrix with three rows and three columns
+collapses into a vector of three along column dimension. Thus a mapping inversion of an element of of the vector
+is all elements in the corresponding row in the matrix. 
+The inversion of {\bf expansion mapping} can also be inferred with simple calculation.
+The inversion of {\bf geometry mapping} is enabled by switch the order of the geometry order of each tuple.
 
-Putting all lineage size reduction strategies together, 
-a profile study of the VOCSIFTFisher pipeline shows that the actual data size is 840.9~GB and the metadata size is 61.3~GB. 
-Writing only metadata can reduce the total I/O amount by a factor of 13.7x.
+For mappings that are not covered by the seven primitive types, we allow users to define {\bf CustomLineage}
+which requires two functions, one for forward mapping and the other for backward mapping.
 
-For the actual data, SystemL only stores the input dataset for the very beginning transformer as mandatory. 
-Users can configure the SystemL to make decisions for other transformers' input and output datasets.
+\subsection{Other Mapping Cases}
+Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the {\bf collapse mapping} and {\bf expansion mapping}
+map spaces that have different dimensions. By definition, they only maps from higher-dimensional space to lower-dimensional space.
+A transformer that reduces lower-dimensional space to higher-dimensional space, e.g., transforming a vector into a matrix, can use
+the same {\bf ExpansionLineage} type for declaration based on the fact that the reverse mapping of this transformation is a
+{\bf expansion mapping}. SystemL can infer the mapping direction based on the metadata of data structures 
+(the number and size of dimensions of a n-dimensional space). 
+A similar solution is used for the reverse of {\bf collapse mapping}.
+
+For sampling transformers, e.g., selecting a subset of a vector collection, SystemL implements it as a {\bf geometry mapping}.
+From the input side, there are a list of geometries (rectangles for vectors) with each pointing to an output geometry (a rectangle for a vector).
+
+In practice, we recommend users to define a transformer with one primitive mapping type to use SystemL and it is often the case since
+we see 39 out of 45 transformers in the current KeystoneML code base are coded this way. 
+In meantime, we also looking into ways to declare complex data transformations by composing the primitive mapping types.
 
 
+\subsection{Lineage Storage}
+SystemL uses the RDD abstraction of Apache Spark for lineage information storage. 
+At a high level, SystemL creates a unique directory on the underlying file system with a naming pattern of 
+concatenating the transformer name and the initial input dataset identifier of the pipeline.
+In this way, SystemL can tell between the training pipeline and test pipeline based on the directory name
+if the training and testing are run in a single program given that the training and test datasets are distinct.
 
+For the datasets and mappings, SystemL write them to file system by calling {\it RDD.saveAsObjectFile(path)}.
+For transformer, model and other parameters, SystemL wraps each of them into an RDD then store them as object files.
 
-\subsection{Actual Dataset Storage}
-In the previous section, we introduce how SystemL separates the metadata from actual data and saves the metadata mapping.
-However, SystemL still needs the actual data to answer the forward and backward query.
-
-Considering a multi transformer pipeline, with each transformer having its own input dataset and output dataset.
-The minimal actual dataset SystemL needs to save to persistent storage is the input dataset for the very beginning transformer, as
-the rest datasets can be reproduced by rerunning the pipeline with the input dataset.
-
-Intuitively, the maximal actual dataset SystemL can save to persistent storage contains all input datasets and output dataset for each transformer.
-Since a transformer's output dataset is also the input dataset for the succeeding transformer, thus the maximal dataset without duplicates
-should include output datasets of all transformers and the input dataset for the beginning transformer. 
-
-Fundamentally, this is a tradeoff between pipeline slowdown, storage space consumption and query overhead. 
-Storing the minimal actual dataset consumes the least space on disk along with the least writing overhead, 
-but access to the actual dataset other than the input introduces overhead due to reexecution of the pipeline or a part of the pipeline.
-Storing the maximal dataset consumes more disk space and more time, but queries over the actual dataset
-have a lower latency.
-
-Assuming SystemL collects lineage information that is complete for the whole pipeline, the space formed by the storage overhead 
-(slowdown depends on the storage overhead) and query overhead defines users' flexibility to make actual dataset storing decision.
-
-In other cases, users are only interested in one or few transformers. E.g. debugging the transformer implementation.
-He may preempt that transformer's lineage by recording all its input and output dataset. 
-And no lineage from other transformers is needed.
-SystemL supports such flexibility by letting the user declare and operate lineage for one or few transformers.
-In turn, the lineage collected in this case only supports query over each individual transformer.
-It these transformers form a sub-pipeline, users can query the lineage throughout this sub-pipeline with SystemL.
-
-As introduced in \S\ref{sec:Design-Lineage}, SystemL collects six types of data for lineage: the input dataset, the output dataset,
-the transformer itself, the mapping collection, the model, and the parameter.
-Among these six data types, the transformer and the collection of mapping are mandatory. 
-The input dataset is mandatory if the transformer is the very first of the pipeline. 
-Otherwise, the input dataset is optional.
-The output dataset is optional, as it can be reproduced by rerunning the transformer with the input dataset.
-The model and parameter are optional.
-
-In terms of data size, the input dataset, the output dataset and the mapping collection is dominant. 
-Since all of these three datasets are of the type of RDD abstraction, SystemL calls the RDD primitive to write these datasets
-to HDFS, so that each partition is written into the local disk. 
-And loading these RDDs from HDFS can benefit from the locality.
-For other data types, we encapsulate them into a RDD and use the same approach to write them to HDFS.
-
-All these six datasets are written into a directory that is named by concatenating the transformer label, 
-the node sequence id in the pipeline, and the id of the initial input dataset. 
-With id of the initial input dataset, SystemL can figure out the branches of the pipeline.
-By looking into the input/output RDD id, SystemL is able to tell the sequence of each transformer in the pipeline.
-Combining the two previous operations, SystemL can build the lineage of a pipeline in the exact same sequence
-as the original pipeline.
 
 \subsection{Geometry Mapping Index}
 \label{sec:GeometryIndex}
-In \S\ref{sec:Design-GeometryMapping}, we introduced the notion of geometry mapping and how we user higher-order function
-to describe the geometry for the purpose of less space consumption. We also present that query of such geometry mapping
-can be slow due to the encoding. 
+In \S\ref{sec:Design-GeometryMapping}, we introduced the notion of geometry mapping and how we use high order function
+to describe the geometry for less storage space. 
+We also present that query of such geometry mapping can be slow due to the encoding. 
 In this section, we discuss four indexing strategies to speedup the query over the geometry mapping. 
 The four indexing strategies are referred as {\bf NoIndex}, {\bf Direct}, {\bf RTree}, and {\bf KMeans}, respectively.
 For simplicity, we only discuss forward query from the input to the output in this section.
-The backward query works in the same way as the forward query.
+The backward query works in a similar way by reverting the the geometry tuple.
 
 
 We use the example in Figure~\ref{fig:example} in the following discussion.
@@ -867,8 +831,7 @@ The time complexity of a query is $O(N)$, where N is the number of circles.
 \subsubsection{Direct Index}
 To build the {\bf Direct} index, we use each input element as key and the associated geometry as the value, as shown in Figure~\ref{fig:direct}.
 We rely on the underlying runtime system for the optimization of storing repeated geometries as an single object,
-then use an pointer (hash value of the object) to point to the geometry object, as shown in Figure~\ref{fig:direct-optimized}.
-This optimization can reduce the storage space of index if the geometry object is larger than the hash value. 
+then using an pointer (hash value of the object) to point to the geometry object, as shown in Figure~\ref{fig:direct-optimized}.
 A query of an element takes two steps: the first step returns the hash value for that element and the second step returns the rectangle. 
 The space complexity of {\bf Direct} index is $O(k*N)$, where $k$ is the number of circles and $N$ is the number of elements in each circle.
 For simplicity, the space complexity of the {\bf Direct} index is $O(N^2)$.
@@ -894,37 +857,36 @@ The time complexity of building index and query are $O(N^2)$ and $O(1)$, respect
 R-tree~\cite{guttman1984} has been introduced to index multidimensional information.
 To simplify the discussion, we use the example shown in Figure~\ref{fig:example} and build the index in a two dimensional space.
 The average query time complexity is $O(logN)$, while the worst case is $O(N)$. 
-The worst case happens when querying an element in a geomerey where all leaf nodes overlap.
-Variants of R-tree, such as R+-tree and R*-tree, seek to improve the worst case query speed by minimizing the overlapped geomerey at leaf nodes.
-While they introduce additional overhead when building the index.
+The worst case happens when querying an element in a geometry where all leaf nodes overlap.
+Variants of R-tree, such as R+-tree~\cite{sellis1987} and R*-tree~\cite{beckmann1990}, 
+seek to improve the worst case query by minimizing the overlapped geometry at leaf nodes 
+by paying the cost for index building.
 
-In our use cases, it is rare that a single element occurs in all geometries. 
-R-tree is sufficient to validate the idea of spatial indexing.
-~\zhaonote{mention kd-tree in the related work.}
+In our use cases, it is rare that a single element occurs in all geometries.  
+R-tree is sufficient to validate the idea of using spatial indexing for geometry mapping.
 
 We use an open source R-tree implementation, Archery~\cite{osheim13} to build the {\bf RTree} index.
 In the Archery implementation, both the leaf nodes and the non-leaf nodes are abstracted as rectangles.
-To differentiate from the rectangle geometries, we call it box.
+To differentiate from the rectangle geometries, we refer to it as box.
 To adapt the geometry to Archery, first we compute the bounding box of each circle, then we use
 a tuple of the bounding box and the circle as leaf node of the R-tree. 
 The index is built upon the bounding boxes. 
 The query of an input element (0,0) in the R-tree returns a tuple of the bounding box (center: (0.5,0.5), height:1, width:1) and circle\_0.
-Then we further check if the element is in circle\_0. 
 The query returns the output elements expanded from Rect\_0 only if the input element is within circle\_0.
 
 The time complexity of building a R-tree is $log(N)$.
-Practically the time complexity of query a R-tree is $log(N)$ in our use cases.
+Practically the time complexity of query a R-tree is $log(N)$ in our use cases, though
+the worst case complexity is $O(N)$.
 And the space complexity for {\bf RTree} index is $log(N)$.
 
 \subsubsection{KMeans Index}
-Inspired by the distribution of the geometries in the SIFTExtract and the SourceExtractor transformer,
-we come up with a simple index with two level of nodes.
-We first cluster the geometries using the KMeans~\cite{macqueen67} algorithm 
-and then build a single layer non-leaf nodes with each non-leaf node covering a cluster.
+We design a two-layer tree index with its leaf nodes as a list of geometries and its non-leaf nodes as the bounding box (same idea as that of R-tree)
+of the geometry list.
+The geometries are distributed to each non-leaf node using the KMeans~\cite{macqueen67} algorithm.
 
 We specify $\sqrt{N}$ clusters, where N is the number of geometries, 
 since $\sqrt{N}$ is the optimal cluster number for the worst case query when N geometries are uniformly distributed in a two dimensional space.
-Clustering $N$ geometriess into $k$ clusters results in $\frac{N}{k}$ elements in each cluster. 
+Clustering $N$ geometries into $k$ clusters results in $\frac{N}{k}$ elements in each cluster. 
 Thus there are $k$ non-leaf nodes.
 A worst case query needs to traverses all $k$ non-leaf nodes and all $\frac{N}{k}$ leaf node in the cluster.
 $k+\frac{N}{k}$ has its minimum when $k=\sqrt{N}$. 
@@ -933,7 +895,7 @@ The time complexity of building the {\bf KMeans} index is $O(N^{1.5})$.
 The average query time complexity is $O(logN)$.
 The space complexity of {\bf KMeans} is $O(\sqrt{N})$.
 
-\subsubsection{Index Strategy Comparison}
+\subsubsection{Index Strategy Asymptotical Comparison}
 Table~\ref{tb:index-comparison} summarizes the index building time complexity, 
 the query time complexity, and the index space complexity.
 
