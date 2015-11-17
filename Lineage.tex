@@ -144,14 +144,14 @@ The weak inversion and verification methods~\cite{woodruff97} for RDBMS-based vi
 was proposed for queries that can tolerate inaccurate fine-grained lineage information.
 Data warehouse fine-grained lineage capturing and serving is enabled by works~\cite{cui00, cui03}.
 Trio~\cite{widom04} tracks lineage for the RDBMS with cell mappings materialization at the same time of view queries.
-Works in fine-grained lineage capturing such as GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} presents
+Works in fine-grained lineage capturing such as RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} presents
 solutions for MapReduce systems, and capture lineage on low level operators such as mappers and reducers.
 SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineage capturing interface at operators and UDFs.
 
 Unfortunately, none of the existing lineage tracking systems is suitable for the distributed ML frameworks for three reasons.
 First, the lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level lineage tracing and query.
 Second, the weak inversion and verification methods relax lineage accuracy thus can not provide accurate lineage information for ML pipeline diagnosis.
-Third, the lineage capturing interface of Trio, GMRW, Newt, and SubZero is designed by at
+Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed by at
 the underlying system operators (e.g., SQL operators for RDMBS, aggregate-select-project-join operators in data warehouse, 
 mappers and reducers in MapReduce systems, and the pre-defined operators and UDFs in SciDB). 
 This approach is general for all workloads running on the system and completely transparent to users, 
@@ -162,9 +162,9 @@ In this work, we present a lineage capturing interface that returns declaration 
 By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
 (Figure~\ref{fig:conceptual} shows an conceptual illustration), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional spaces along one dimension at a time, 
-resulting in {\bf collapse} mapping(\textcircled{1}) and {\bf expansion} mapping(\textcircled{6}, \textcircled{7}). 
-Mappings between spaces with the same number of dimensions can be {\bf identity} mapping(\textcircled{5}), {\bf all} mapping(\textcircled{9}), 
-{\bf geometry} mapping(\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping(\textcircled{3}, \textcircled{8}),
+resulting in {\bf collapse} mapping (\textcircled{1}) and {\bf expansion} mapping (\textcircled{6}, \textcircled{7}). 
+Mappings between spaces with the same number of dimensions can be {\bf identity} mapping (\textcircled{5}), {\bf all} mapping (\textcircled{9}), 
+{\bf geometry} mapping (\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping (\textcircled{3}, \textcircled{8}),
 and {\bf join} mapping. 
 This interface covers 87\% (39 out of 45) of the data transformations in the current code base of KeystoneML. 
 For transformations that are not covered, the lineage capturing interface allows users to specify a customized mapping function.
@@ -204,14 +204,17 @@ In addition, SystemL exposes an interface for users to specify lineage types and
 When queried, SystemL can load the lineage information from storage and reconstruct the lineage chain.
 Users have the flexibility to reconstruct a single transformer lineage, a partial chain, or the whole chain.
 
+SystemL enables lineage-based ML pipeline diagnostics such as code validation, results inspection, and data cleaning.
+A detailed discussion of these three use cases is presented in \S\ref{sec:Back-cases}.
+Versus a time-efficient but space-inefficient strategy of materializing cel-wise mapping, 
+SystemL's techniques (spatial index + high-order function geometry) enable 2x-31x speedups at lineage query time.
+While this new capability comes at the cost of performance overhead during pipeline training/execution.
+The overhead is measured in wall clock time increase, memory consumption, and storage space.
+For the three use cases, the wall clock time overhead is 16\%-54\%, which is comparable to other distributed lineage systems
+such as the Hadoop~\cite{HADOOP}-based RAMP~\cite{ikeda11, park11} (16\%-76\% as reported)  and Newt~\cite{logothetis13} (20\%-50\% as reported).
+SystemL increases memory usage by 31\%-79\%,
+and the storage space for lineage information varies case by case from $\sim$100~MB to $\sim$1~TB.
 
-Combining the high-order function approach and spatial indexing strategies, 
-the geometry lineage query is improved by 2x-31x.
-Storage consumption is reduced by up to 45x compared to the element-wise mapping recording. 
-Our measurements with the three representative ML pipelines show that SystemL lineage 
-capturing scales no worse than the ML pipelines.
-The performance penalty for three typical use cases (discussed in \S\ref{sec:Back-cases}) ranges from 16\% to 54\%.
-The query for these use cases takes from 0.1~s to 1.8~s. 
 
 In summary, we make the following contributions:
 \begin{shortlist}
@@ -222,7 +225,7 @@ In summary, we make the following contributions:
 \end{shortlist}
 
 
-\section{Use Cases and KeystoneML}
+\section{Use Cases and K\MakeLowercase{eystone}ML}
 \label{sec:Background}
 In this section, we present three motivating use cases of SystemL and briefly review KeystoneML.
 
@@ -240,7 +243,7 @@ Lineage offers a natural way for these users to hone in on the areas where two s
 \begin{figure}[ht]
 \begin{center}
     \includegraphics[width=85mm]{pictures/VOCSIFTFisher}
-    \caption {The SIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators, shaded boxes are calling out to C library for computation.
+    \caption {The SIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
     \label{fig:vocsiftfisher}
 }
 \end{center}
@@ -260,7 +263,7 @@ Fine-grained data lineage of ML pipelines have sufficient information for such i
 \begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SourceExtractor}
-    \caption {The SourceExtractor pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators, shaded boxes are calling out to C library for computation.
+    \caption {The SourceExtractor pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
     \label{fig:sourceextractor}
 }
 \end{center}
@@ -278,15 +281,18 @@ Either through mathematical analysis or human intervention, they are able to val
 \subsubsection{Data Cleaning}
 \label{sec:Back-Case-Cleaning}
 Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
-A user of the SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, observes a low prediction accuracy for a category of images, especially 
-when cats and dogs are in the same image. A natural investigation is then to remove the images with both cats and dogs,
-and test if that improves prediction accuracy.
+The ML expert who is building a SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, identifies bad 
+training data items due to measurement error (e.g. the images that have both dogs and cats). A natural 
+investigation is then to remove these images, and test if that improves prediction accuracy.
 
+With SystemL, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
+directly into KeystoneML, filter out the data items that are derived from the images with both dogs and cats , 
+and apply the filtered dataset directly to the linear solver.
+In this way, the rerunning process can bypass the expensive data preparation procedure (from PixelScaler to RowNormalizer) 
+resulting in shorter turnaround time.
 Without lineage information, the user has to remove the according images from the training set and rerun data
 preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
-With lineage information, the user can intercept the pipeline by loading the output of RowNormalizer directly into KeystoneML,
-filter out the data items that are derived from the images that have people and dogs together , and apply the filtered dataset directly to the linear solver.
-In this case, the rerunning process can bypass the expensive data preparation procedure resulting in shorter turn-around time.
+
 
 \subsection{KeystoneML}
 KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
@@ -361,18 +367,24 @@ LEFT OUTER JOIN output
 
 In practice, we separate the metadata from the actual element values and only record metadata mapping.
 \begin{lstlisting}
-INSERT INTO mapping (in_meta, out_meta)
-SELECT in.meta, out.meta
+CREATE TABLE mapping
+(
+  In_meta (INT, INT),
+  Out_meta (INT, INT)
+);
+
+INSERT INTO mapping (In_meta, Out_meta)
+SELECT in.Meta, out.Meta
 From input
 LEFT OUTER JOIN output 
-    ON Fun(in.meta) $\ni$ out.meta;
+    ON Fun(in.Meta) $\ni$ out.Meta;
 \end{lstlisting}
 The retrieval of actual element values can be obtained by joining the mapping table and the output dataset table.
 \begin{lstlisting}
-SELECT mapping.meta, out.value
+SELECT mapping.Meta, out.Value
 From mapping
 LEFT OUTER JOIN output 
-    ON mapping.out_meta = output.meta;
+    ON mapping.Out_meta = output.Meta;
 \end{lstlisting}
 
 The input and output mapping of a pipeline is in turn a sequence of mappings of individual transformer.
@@ -405,9 +417,8 @@ long running time.
 One natural thought in such case is ``can we skip the computation applied on the unchanged data items by removing
 the corresponding prepared data items directly?''
 
-Formally, given a data transformation {\it f()} applied on a collection $C$ of vectors \{$v_1, v_2, ..., v_n$\}.
-we say it is safe to remove {\it f($v_i$)} when {\it $f(C/v_i)) = f(C)/f(v_i))$}.
-The notion {\it $C/v_i$} can be interpreted as the collection derived by removing $v_i$ from $C$.
+Formally, given a data transformation {\it f()} applied on a set $C$ of vectors \{$v_1, v_2, ..., v_n$\}.
+we say it is safe to remove {\it f($v_i$)} when {\it $f(C \setminus {v_i})) = f(C) \setminus {f(v_i)}$}.
 In other words, function {\it f()} is distributive on vectors \{$v_1, v_2, ..., v_n$\}. 
 With single or few transformers, users are able to track the distributive property.
 However when the pipeline is deep, such property is hard to track.
@@ -545,18 +556,19 @@ In turn, a partial pipeline assembled by a sequence of transformers of the origi
 \label{sec:Req-Perf}
 In general, as lineage capturing incurs additional computation and I/O for mapping materialization and storage, a non-trivial performance
 penalty based on the original workload is expected. 
-Table~\ref{tb:overhead} summarizes documented performance penalty introduced by lineage capturing in recent works. 
+Table~\ref{tb:overhead} summarizes reported performance penalty introduced by lineage capturing in existing systems and SystemL. 
 
 \begin{table}[ht]
 \begin{center}
-    \caption{Performance Penalty Reported in Recent Lineage System}
+    \caption{Performance Penalty Reported by Existing Lineage Systems and SystemL}
     \begin{scriptsize}
-    \begin{tabular}{ | p{2cm} | p{2.5cm} | p{2.8cm} |}
+    \begin{tabular}{ | p{1.5cm} | p{3.5cm} | p{2cm} |}
     \hline
-    Project & Underlying System & Performance Penalty  \\ \hline \hline
-    GMRW~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
+    Project & Underlying System & Perf Penalty  \\ \hline \hline
+    RAMP~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
     Newt~\cite{logothetis13} & Hadoop~\cite{HADOOP} & 20-50\% \\ \hline
     SubZero~\cite{wu13} & SciDB~\cite{brown10} & 50\%-150\% \\ \hline
+    SystemL & KeystoneML~\cite{sparks15}, Spark~\cite{zaharia12} & 16\%-54\% \\ \hline
     \end{tabular}
     \end{scriptsize}
     \label{tb:overhead}
@@ -989,7 +1001,7 @@ Table~\ref{tb:apps-overhead} presents the measure numbers, for each data point i
 average of three executions. 
 
 We see the performance penalty ranges from 25.6\% to 62.2\%, this performance penalty is comparable to that
-of previous works of GMRW (16$\sim$76\%), Newt (20$\sim$50\%), and SubZero(20\%$\sim$150\%).
+of previous works of RAMP (16$\sim$76\%), Newt (20$\sim$50\%), and SubZero(20\%$\sim$150\%).
 The memory usage overhead comparing to the baseline case is 200\% for MNIST pipeline, however it is using only
 193~GB out of 3.9~TB memory space. 
 For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (1.6~TB), the additional usage is 38.5\% and 43.7\%, respectively.
@@ -1128,7 +1140,7 @@ Since the lineage collected is coarse-grained, it is not sufficient for cell lev
 
 Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
 data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
-Recent works of GMRW~\cite{ikeda11} and Newt~\cite{logothetis13} collects fine-grained lineage for the mapreduce
+Recent works of RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} collects fine-grained lineage for the mapreduce
 systems. SubZero~\cite{wu13} proposes a prototype lineage system for array-based database system SciDB~\cite{brown10}.
 All these systems employ a bottom-up approach to design lineage capturing interface as the underlying systems all have well regulated low level operators.
 For example, the data warehouse has the aggregate, select, project, join operators. 
