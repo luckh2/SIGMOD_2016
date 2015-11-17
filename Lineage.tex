@@ -127,17 +127,17 @@ Commonly, they use a case-by-case solution to record necessary information, and 
 These solutions are often use case specific, performance degradation prone, and they can complicate code
 management due to the demand for multiple versions of a pipeline.
 Given that this is a repeated pattern taken on by users of the system, it is natural to add support 
-that is flexible for users in terms of lineage specification, instrumentation and query.
+for flexible lineage specification, instrumentation and query.
 
 In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained lineage information
 (data lineage at a structure cell level, e.g. elements in a matrix). 
 We assume an ML framework with a programming model that abstracts a pipeline as a chain of data transformations, such as KeystoneML
 which builds on top of Apache Spark, and use two building blocks: {\bf transformers} and {\bf estimators}.
-A transformer applies a deterministic unary function to data items and produce new data items.
-An estimator takes a collection of data items, and feed them to a training procedure,  and produces a transformer.
-We choose this model because users can declare and instrument lineage collection in the transformer.
+A {\bf transformer} applies a deterministic unary function to data items and produce new data items.
+An {\bf estimator} takes a collection of data items, and feed them to a training procedure,  and produces a {\bf transformer}.
+We choose this model because users can declare and instrument lineage capturing in the transformer.
 This diagnostic system enables users to specify the data transformation lineage with a concise interface, customize the instrumentation, 
-collect fine-grained lineage with a minimal performance penalty, and serve the lineage query 
+capture fine-grained lineage with a minimal performance penalty, and serve the lineage query 
 (e.g., query the input elements that contribute to an output element) with a low latency. 
 
 %answer sophisticated lineage query responsively( with query latency lower than 10~seconds~\cite{nielsen2009}).
@@ -150,27 +150,49 @@ Data warehouse fine-grained lineage capturing and serving is enabled by works~\c
 Trio~\cite{widom04} tracks lineage for the RDBMS with cell mappings materialization at the same time of view queries.
 Works in fine-grained lineage capturing such as RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} presents
 solutions for MapReduce systems, and capture lineage on low level operators such as mappers and reducers.
-SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineage capturing interface at operators and UDFs.
+SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineage capturing interface on predefined SciDB operators and UDFs.
 
 Unfortunately, none of the existing lineage tracking systems are suitable for the distributed ML frameworks for three reasons.
 First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level lineage tracing and query.
 Second, the approximate fine-grained approaches, such as weak inversion and verification methods, 
 relax lineage accuracy thus can not provide accurate lineage information for ML pipeline diagnosis.
-Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed by at
+Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed at
 the underlying system operators (e.g., SQL operators for RDMBS, aggregate-select-project-join operators in data warehouse, 
 mappers and reducers in MapReduce systems, and the pre-defined operators and UDFs in SciDB). 
 This approach is general for all workloads running on the system and completely transparent to users, 
 thus it gives users very limited flexibility for customized instrumentation (specification of lineage type and the data to be collected) 
-in the case when users know the exact data to collect.
+in the case even if users know the exact data to collect.
+Other challenges of building such an ML framework diagnostic system include the performance penalty introduced by 
+lineage capturing and the low latency requirement for lineage queries.
+Table~\ref{tb:overhead} shows the performance penalty incurred by lineage capturing in recent work.
+According to the report~\cite{nielsen2009}, 1~second considered to be the boundary of though flow while 
+10~seconds considered as the boundary to loose a use's attention.
+
+\begin{table}[t]
+\begin{center}
+    \caption{Performance Penalty Reported by Existing Lineage Systems}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{1.5cm} | p{3.5cm} | p{2cm} |}
+    \hline
+    Project & Underlying System & Perf Penalty  \\ \hline \hline
+    RAMP~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
+    Newt~\cite{logothetis13} & Hadoop~\cite{HADOOP} & 20-50\% \\ \hline
+    SubZero~\cite{wu13} & SciDB~\cite{brown10} & 50\%-150\% \\ \hline
+    %SystemX & KeystoneML~\cite{sparks15}, Spark~\cite{zaharia12} & 16\%-54\% \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:overhead}
+\end{center}   
+\end{table}
 
 In this work, we present a lineage capturing interface that returns declaration and instrumentation flexibility to users. 
 By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
 (Figure~\ref{fig:conceptual} shows an conceptual illustration), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional spaces along one dimension at a time, 
 resulting in {\bf collapse} mapping (\textcircled{1}) and {\bf expansion} mapping (\textcircled{6}, \textcircled{7}). 
-Mappings between spaces with the same number of dimensions can be {\bf identity} mapping (\textcircled{5}), {\bf all} mapping (\textcircled{9}), 
+A mapping between spaces with the same number of dimensions can be {\bf identity} mapping (\textcircled{5}), {\bf all} mapping (\textcircled{9}), 
 {\bf geometry} mapping (\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping (\textcircled{3}, \textcircled{8}),
-and {\bf join} mapping. 
+or {\bf join} mapping. 
 This interface covers 87\% (39 out of 45) of the data transformations in the current code base of KeystoneML. 
 For transformations that are not covered, the lineage capturing interface allows users to specify a customized mapping function.
 A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
@@ -199,8 +221,8 @@ SystemX is integrated with the KeystoneML~\cite{sparks15} distributed machine le
 SystemX interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
 SystemX exploits the  data structure metadata (e.g., the size of each dimension of a space) for mapping recording to reduce storage overhead.
 It also uses a high-order function approach and spatial index for geometry mapping which does not have a regular mapping pattern.
-SystemX collects five types of data for each transformer: the input dataset, the output dataset, the mapping between them
-along with the computation and the optional model.
+SystemX collects six types of data for each transformer: the input dataset, the output dataset, the mapping between them
+along with the computation, the optional model, and the optional random factor.
 SystemX stores the lineage information on HDFS~\cite{shvachko10} via the resilient distributed dataset (RDD) abstraction
 of Apache Spark~\cite{zaharia12}, the underlying computing engine of KeystoneML.
 Unlike Spark lineage, which tracks partition level data dependency and associated computation for internal system resilience,
@@ -211,12 +233,12 @@ Users have the flexibility to reconstruct a single transformer lineage, a partia
 
 SystemX enables lineage-based ML pipeline diagnostics such as code validation, results inspection, and data cleaning.
 A detailed discussion of these three use cases is presented in \S\ref{sec:Back-cases}.
-Versus a time-efficient but space-inefficient strategy of materializing cel-wise mapping, 
+Versus a time-efficient but space-inefficient strategy of materializing cell-wise mapping, 
 SystemX's techniques (spatial index and high-order function) enable 2x-31x speedups at lineage query time.
 While this new capability comes at the cost of performance overhead during pipeline training/execution.
 The overhead is measured in wall clock time increase, memory consumption, and storage space.
 For the three use cases, the wall clock time overhead for lineage capturing is 16\%-54\%, which is comparable to other distributed lineage systems
-such as the Hadoop~\cite{HADOOP}-based RAMP~\cite{ikeda11, park11} (16\%-76\% as reported)  and Newt~\cite{logothetis13} (20\%-50\% as reported).
+summarized in Table~\ref{tb:overhead}.
 SystemX increases memory usage by 31\%-79\%,
 and the storage space for lineage information varies case by case from $\sim$100~MB to $\sim$1~TB.
 
@@ -235,8 +257,8 @@ Two basic functions of SystemX are lineage capturing and serving.
 SystemX requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
 collect lineage information and customize instrumentation (deciding what dataset to store). 
 This interface should be concise with a few variations and options.
-This interface should also be powerful in terms of coverage of transformers.
-This interface should be flexible so that users can define their own lineage and instrumentation.
+This interface should also be powerful in terms of data transformation coverage.
+This interface should be flexible so that users can define their own lineage type and instrumentation.
 
 To serve lineage for query, SystemX requires a user interface to reconstruct and chain collected lineage.
 Each transformer should provide the forward query (qForward()) and backward query (qBackward()) functionality.
@@ -247,11 +269,13 @@ In turn, a partial pipeline assembled by a sequence of transformers of the origi
 
 \section{Use Cases and K\MakeLowercase{eystone}ML}
 \label{sec:Background}
-In this section, we present three motivating use cases of SystemX and briefly review KeystoneML.
+To motivate SystemX, we present three representative use cases of using fine-grained lineage for ML pipeline diagnostics.
+A brief review of KeystoneML is presented to help understand the technical background of this work.
 
 \subsection{Use Cases}
 \label{sec:Back-cases}
-We select three use cases from real ML pipelines, these three cases are representative for code validation, results inspection, and data cleaning, respectively.
+The three use cases come from real ML pipelines of image classification and astronomy image processing. 
+These three cases are representative for code validation, results inspection, and data cleaning, respectively.
 
 \subsubsection{Code Validation}
 In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
@@ -280,9 +304,6 @@ By visualizing the features we could see that the new features added to our mode
 Users of ML pipelines often interpret the results, identify some potential data anomalies, then retrospect the supporting input data for better understanding.
 Fine-grained data lineage of ML pipelines have sufficient information for such investigation.
 
-One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
-that processes images from the telescopes and produces astronomical object catalogs. 
-
 \begin{figure}[ht]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SourceExtractor}
@@ -292,13 +313,15 @@ that processes images from the telescopes and produces astronomical object catal
 \end{center}
 \end{figure}
 
+One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
+that processes images from the telescopes and produces astronomical object catalogs. 
 The astronomical object catalog includes the position, shape, and other statistical properties of the object.
 In this case, astronomers find the bright objects over a threshold and validate that these objects are indeed astronomical objects rather
 than noise caused by cosmic rays.
 With the lineage information, astronomers can first filter the results to find the objects whose brightness is above a threshold.
 Then using backward query, they can find corresponding pixels for these bright objects. 
 Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
-Then the astronomer can use forward query to figure how this bad pixel propagates to the results in the catalogs.
+Then the astronomer can use forward query to figure how a bad pixel propagates to the results in the catalogs.
 
 \subsubsection{Data Cleaning}
 \label{sec:Back-Case-Cleaning}
@@ -568,22 +591,6 @@ In general, as lineage capturing incurs additional computation and I/O for mappi
 penalty based on the original workload is expected. 
 Table~\ref{tb:overhead} summarizes reported performance penalty introduced by lineage capturing in existing systems and SystemX. 
 
-\begin{table}[t]
-\begin{center}
-    \caption{Performance Penalty Reported by Existing Lineage Systems and SystemX}
-    \begin{scriptsize}
-    \begin{tabular}{ | p{1.5cm} | p{3.5cm} | p{2cm} |}
-    \hline
-    Project & Underlying System & Perf Penalty  \\ \hline \hline
-    RAMP~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
-    Newt~\cite{logothetis13} & Hadoop~\cite{HADOOP} & 20-50\% \\ \hline
-    SubZero~\cite{wu13} & SciDB~\cite{brown10} & 50\%-150\% \\ \hline
-    SystemX & KeystoneML~\cite{sparks15}, Spark~\cite{zaharia12} & 16\%-54\% \\ \hline
-    \end{tabular}
-    \end{scriptsize}
-    \label{tb:overhead}
-\end{center}   
-\end{table}
 
 This performance penalty problem is exacerbated for SystemX, since KeystoneML's distributed computing engine Apache Spark 
 optimizes for in-memory computing and does not write intermediate data to disks unless it is a shuffle operation. 
@@ -1038,17 +1045,18 @@ For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (
 We use the same three ML pipelines and execute them on clusters with {8, 16, 32, 64} of machines.
 We measure the performance of the baseline (without lineage), lineage with only metadata mapping, 
 and lineage with both metadata mapping and datasets. 
-Then we decompose the running time for NoLineage, Meta, and Data, and show the relative scalability
+Then we isolate the SystemX's overhead from the pipelines and show the relative scalability
  to the performance of 8 machines, shown as Figure~\ref{fig:scalability}.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \begin{center}
-    \includegraphics[width=85mm]{pictures/Scalability}
+    \includegraphics[width=120mm]{pictures/Scalability}
 \caption {Relative Speedup of the VOCSIFTFisher, Source Extractor, and MNIST Pipelines with SystemX over Eight Nodes.
+Speedup is measured by isolating SystemX's overhead.
     \label{fig:scalability}
 }
 \end{center}
-\end{figure}
+\end{figure*}
 
 One pattern we can conclude from the scalability measurements is that SystemX scales no worse than the ML pipelines.
 This is due to the fact that SystemX captures and stores the lineage information via the RDD abstraction, which perform
