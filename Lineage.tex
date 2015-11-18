@@ -172,7 +172,7 @@ According to the report~\cite{nielsen2009}, 1~second considered to be the bounda
 \begin{center}
     \caption{Performance Penalty Reported by Existing Lineage Systems}
     \begin{scriptsize}
-    \begin{tabular}{ | p{1.5cm} | p{3.5cm} | p{2cm} |}
+    \begin{tabular}{ | c | c | c |}
     \hline
     Project & Underlying System & Perf Penalty  \\ \hline \hline
     RAMP~\cite{ikeda11} & Hadoop~\cite{HADOOP} & 16-76\% \\ \hline
@@ -793,6 +793,7 @@ In \S\ref{sec:Design-GeometryMapping}, SystemX introduces the notion of geometry
 to describe the geometry for less storage space. 
 We also state that query of such geometry mapping can be slow due to the encoding. 
 In this section, we discuss four indexing strategies to speedup the query over the geometry mapping. 
+An empirical performance study is presented in \S\ref{sec:Perf-Index}.
 The four indexing strategies are referred as {\bf NoIndex}, {\bf Direct}, {\bf RTree}, and {\bf KMeans}, respectively.
 For simplicity, only forward query from the input to the output is discussed in this section.
 The backward query works in a similar way by reverting the the geometry tuple.
@@ -813,7 +814,7 @@ Table~\ref{tb:example} shows the mapping for each element and the regressed 2D g
 \begin{center}
     \caption{Element-wise mapping and regressed geometry mapping of the example in Figure~\ref{fig:example}}
     \begin{scriptsize}
-    \begin{tabular}{ | p{1.75cm} | p{1.75cm} | p{1.75cm} | p{1.75cm} |}
+    \begin{tabular}{ | c | c | c | c |}
     \hline
     Input & Geometry & Output & Geometry \\ \hline \hline
     (0,0),...,(1,1) & Circle\_0 & (0,0),(1,0) & Rect\_0 \\ \hline
@@ -897,32 +898,32 @@ The time complexity of building the {\bf KMeans} index is $O(N^{1.5})$.
 The worst case query time complexity is $O(\sqrt{N})$.
 The space complexity of {\bf KMeans} is $O(\sqrt{N})$.
 
-\subsubsection{Index Strategy Asymptotical Comparison}
-Table~\ref{tb:index-comparison} summarizes the index building time complexity, 
-the query time complexity, and the index space complexity.
-
-\begin{table}[t]
-\begin{center}
-    \caption{Index Strategy Comparison}
-    \begin{scriptsize}
-    \begin{tabular}{ | p{1.75cm} | p{1.75cm} | p{1.75cm} | p{1.75cm} |}
-    \hline
-    Strategy & Building & Worst Query & Space \\ \hline \hline
-    NoIndex & 0 & $O(N)$ & 0 \\ \hline
-    Direct & $O(N^2)$ & $O(1)$ & $O(N^2)$ \\ \hline
-    RTree & $O(N)$ & $O(\sqrt{N})$ & $O(logN)$ \\ \hline
-    KMeans & $O(N^{1.5})$ & $O(N)$ & $O(\sqrt{N})$ \\ \hline
-    \end{tabular}
-    \end{scriptsize}
-    \label{tb:index-comparison}
-\end{center}   
-\end{table}
-
-{\bf Direct}'s query performance is the best from analysis, however the building time overhead and space overhead is quite high.
-{\bf RTree} and {\bf KMeans} have a more balanced building time, space and query performance.
-In reality, we see the performance of {\bf RTree} an {\bf KMeans} are significantly affected by parameters such as the
-number of boxes in each non-leaf node for {\bf RTree} and the number of iterations for {\bf KMeans}.
-A detailed performance study is present in \S\ref{sec:Perf-Index}.
+%\subsubsection{Index Strategy Asymptotical Comparison}
+%Table~\ref{tb:index-comparison} summarizes the index building time complexity, 
+%the query time complexity, and the index space complexity.
+%
+%\begin{table}[t]
+%\begin{center}
+%    \caption{Index Strategy Comparison}
+%    \begin{scriptsize}
+%    \begin{tabular}{ | c | c | c | c |}
+%    \hline
+%    Strategy & Building & Worst Query & Space \\ \hline \hline
+%    NoIndex & 0 & $O(N)$ & 0 \\ \hline
+%    Direct & $O(N^2)$ & $O(1)$ & $O(N^2)$ \\ \hline
+%    RTree & $O(N)$ & $O(\sqrt{N})$ & $O(logN)$ \\ \hline
+%    KMeans & $O(N^{1.5})$ & $O(N)$ & $O(\sqrt{N})$ \\ \hline
+%    \end{tabular}
+%    \end{scriptsize}
+%    \label{tb:index-comparison}
+%\end{center}   
+%\end{table}
+%
+%{\bf Direct}'s query performance is the best from analysis, however the building time overhead and space overhead is quite high.
+%{\bf RTree} and {\bf KMeans} have a more balanced building time, space and query performance.
+%In reality, we see the performance of {\bf RTree} an {\bf KMeans} are significantly affected by parameters such as the
+%number of boxes in each non-leaf node for {\bf RTree} and the number of iterations for {\bf KMeans}.
+%A detailed performance study is present in \S\ref{sec:Perf-Index}.
 
 %\begin{table}[t]
 %\begin{center}
@@ -961,11 +962,11 @@ Table~\ref{tb:datasets} summarizes the size and number of files of the datasets.
 \begin{center}
     \caption{Data Size of SIFTFisher and SourceExtractor with the Meta-only and Meta+Data settings}
     \begin{scriptsize}
-    \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | }
+    \begin{tabular}{ | c | c | c | }
     \hline
-    Dataset & VOC & SDSS DR7 \\ \hline \hline
-    Size & 828~MB & 65~GB \\ \hline
-    File Count & 10,000 & 11,150 \\ \hline
+    Dataset & Size & File Count \\ \hline \hline
+    VOC& 828~MB &10,000  \\ \hline
+    SDSS DR7 & 65~GB & 11,150 \\ \hline
     \end{tabular}
     \end{scriptsize}
     \label{tb:datasets}
