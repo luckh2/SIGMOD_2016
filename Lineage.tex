@@ -148,6 +148,7 @@ Existing lineage tracking system such as Chimera~\cite{foster02} and and Taverna
 of files and computations for scientific workflow systems.
 The weak inversion and verification methods~\cite{woodruff97} for RDBMS-based visualization system 
 was proposed for queries that can tolerate inaccurate fine-grained lineage information.
+DeepDive~\cite{shin15} explores approximate inference for the incremental maintenance problem in the context of knowledge base system.
 Data warehouse fine-grained lineage capturing and serving is enabled by works~\cite{cui00, cui03}.
 Trio~\cite{widom04} tracks lineage for the RDBMS with cell mappings materialization at the same time of view queries.
 Works in fine-grained lineage capturing such as RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} presents
@@ -156,7 +157,7 @@ SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineag
 
 Unfortunately, none of the existing lineage tracking systems are suitable for the distributed ML frameworks for three reasons.
 First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level lineage tracing and query.
-Second, the approximate fine-grained approaches, such as weak inversion and verification methods, 
+Second, the approximate fine-grained approaches, such as approximate inference, weak inversion and verification methods, 
 relax lineage accuracy thus can not provide accurate lineage information for ML pipeline diagnosis.
 Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed at
 the underlying system operators (e.g., SQL operators for RDMBS, aggregate-select-project-join operators in data warehouse, 
@@ -1239,6 +1240,7 @@ while SystemX can support many to many relationships as well.
 Weak inversion and verification methods~\cite{woodruff97} are proposed to support approximate lineage collection.
 Dynamic program analysis is employed to capture fine-grained lineage inside non-relational operators~\cite{zhang07} with 
 a 7.5$\sim$39.8x slowdown comparing the original program. 
+DeepDive~\cite{shin15} explores approximate inference for the incremental maintenance problem in the context of knowledge base system.
 These approaches do not fit the ML pipeline lineage scenario since they either loose the lineage accuracy or introduce
 excessive performance penalty.
 The Arnold system~\cite{devecsery14} captures fine-grained lineage at operating system process level by recoding
