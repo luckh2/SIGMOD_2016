@@ -24,7 +24,7 @@ ax.grid(True)
 
 
 ax.set_xlabel('Scale (Number of Machines)', size='x-large')
-ax.set_ylabel('Isolated Overhead (seconds)', size='x-large', labelpad=20)
+ax.set_ylabel('Wall Clock Time (seconds)', size='x-large', labelpad=20)
 ax.set_xticks(ind+0.4)
 ax.set_xticklabels( ('4', '8', '16', '32', '64'), size='x-large') 
 ax.legend( (rects1[0], rects2[0]), ('SIFTFisher Meta-only', 'SIFTFisher Meta+Data'), loc='best')

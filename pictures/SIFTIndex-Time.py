@@ -24,8 +24,8 @@ rects4 = ax.bar(ind, Index, width, color='red', bottom=np.add(Metadata,Baseline)
 ax.grid(True)
 
 # add some text for labels, title and axes ticks
-ax.set_xlabel('Region Lineage Index Strategy', size='x-large')
-ax.set_ylabel('Time-to-solution (seconds)', size='x-large')
+ax.set_xlabel('Geometry Mapping Index Strategy', size='x-large')
+ax.set_ylabel('Wall Clock Time (seconds)', size='x-large')
 ax.set_xticks(ind+0.375)
 ax.set_xticklabels( ('NoLineage', 'NoIndex', 'RTree', 'KMeans-1', 'KMeans-5'), size='x-large') 
 plt.yticks(size='large')

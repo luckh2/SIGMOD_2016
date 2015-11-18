@@ -37,7 +37,7 @@ ax.grid(True)
 #args = dict(horizontalalignment='left', verticalalignment='bottom')
 # add some text for labels, title and axes ticks
 ax.set_xlabel('Lineage Type', size='x-large')
-ax.set_ylabel('Query Turnaround (ms)', size='x-large', labelpad=20)
+ax.set_ylabel('Query Latency (ms)', size='x-large', labelpad=20)
 ax.set_yscale('log')
 ax.set_xticks(ind+0.45)
 ax.set_xticklabels( ('All', 'Identity', 'LinCom', 'Expansion', 'Collapse', 'Join', 'Geometry'), size='x-large') 

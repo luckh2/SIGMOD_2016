@@ -878,8 +878,7 @@ The query of an input element (0,0) in the R-tree returns a tuple of the boundin
 The query returns the output elements expanded from Rect\_0 only if the input element is within circle\_0.
 
 The time complexity of building a R-tree is $log(N)$.
-Practically the time complexity of query a R-tree is $log(N)$ in our use cases, though
-the worst case complexity is $O(N)$.
+The worst case time complexity of query a R-tree is $O(N)$.
 And the space complexity for {\bf RTree} index is $log(N)$.
 
 \subsubsection{KMeans Index}
@@ -895,7 +894,7 @@ A worst case query needs to traverses all $k$ non-leaf nodes and all $\frac{N}{k
 $k+\frac{N}{k}$ has its minimum when $k=\sqrt{N}$. 
 
 The time complexity of building the {\bf KMeans} index is $O(N^{1.5})$.
-The average query time complexity is $O(logN)$.
+The worst case query time complexity is $O(\sqrt{N})$.
 The space complexity of {\bf KMeans} is $O(\sqrt{N})$.
 
 \subsubsection{Index Strategy Asymptotical Comparison}
@@ -908,11 +907,11 @@ the query time complexity, and the index space complexity.
     \begin{scriptsize}
     \begin{tabular}{ | p{1.75cm} | p{1.75cm} | p{1.75cm} | p{1.75cm} |}
     \hline
-    Strategy & Building & Query & Space \\ \hline \hline
+    Strategy & Building & Worst Query & Space \\ \hline \hline
     NoIndex & 0 & $O(N)$ & 0 \\ \hline
     Direct & $O(N^2)$ & $O(1)$ & $O(N^2)$ \\ \hline
-    RTree & $O(N)$ & $O(logN)$ & $O(logN)$ \\ \hline
-    KMeans & $O(N^{1.5})$ & $O(logN)$ & $O(\sqrt{N})$ \\ \hline
+    RTree & $O(N)$ & $O(\sqrt{N})$ & $O(logN)$ \\ \hline
+    KMeans & $O(N^{1.5})$ & $O(N)$ & $O(\sqrt{N})$ \\ \hline
     \end{tabular}
     \end{scriptsize}
     \label{tb:index-comparison}
@@ -946,21 +945,55 @@ A detailed performance study is present in \S\ref{sec:Perf-Index}.
 In this section, we evaluate a number of aspects of SystemX's performance.
 We demonstrate a set of built-in indexing strategy for geometry mapping, and profile the tradeoff
 between index building time, query performance, memory usage and storage consumption.
-The end-to-end performance and memory/disk usage for three real ML pipelines are presented.
-Then we show the profiling of SystemX's scalability with three real ML pipelines on varying cluster sizes.
-Last, we measure the performance of the three use cases presented in \S\ref{sec:Back-cases} with 
-fine-grained lineage and its according cost.
+Then we present the scalability of SystemX's lineage capturing with two real ML pipelines on varying cluster sizes.
+We also measure the performance of the three use cases presented in \S\ref{sec:Back-cases}.
 
 Unless otherwise specified, all experiments are run on Amazon EC2 using r3.8xlarge instances.
 Each machine has 16 physical cores, 244 GB memory, and two 320GB SSD. 
 SystemX is integrated with KeystoneML 0.3 which in turn runs over Spark 1.3.1, HDFS from the
 CDH4 distribution of Hadoop. 
 
+The two pipelines we are using are SIFTFisher and SourceExtractor. 
+The datasets VOC2007~\cite{pascal-voc-2007} and a subset of Sloan Digital Sky Survey~\cite{york00} (SDSS) Data Release 7, respectively.
+Table~\ref{tb:datasets} summarizes the size and number of files of the datasets.
+
+\begin{table}[t]
+\begin{center}
+    \caption{Data Size of SIFTFisher and SourceExtractor with the Meta-only and Meta+Data settings}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | }
+    \hline
+    Dataset & VOC & SDSS DR7 \\ \hline \hline
+    Size & 828~MB & 65~GB \\ \hline
+    File Count & 10,000 & 11,150 \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:datasets}
+\end{center}   
+\end{table}
+
 \subsection{Geometry Mapping Index}
 \label{sec:Perf-Index}
 With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:GeometryIndex}.
 We use a workload with 5,000 pairs of input and output matrix, with each pair producing 60,000 geometry mappings that are uniformly distributed
-in 2D space. The total number of mappings has 300 million geometries. The experiment was executed on a 16 machine cluster.
+in 2D space. The total number of mappings has 300 million geometries. 
+This test workload is derived from the SIFTExtractor transformer in the SIFTFisher pipeline.
+The experiment was executed on a 16 machine cluster.
+
+Figure~\ref{fig:sift-query} presents the query performance with these indexing strategies.
+For each strategy, we run queries with {1, 100, 1000, 10000} batch size.
+NoIndex strategy perform worst among the four strategies, the query latency quickly grow over 10,000~ms with batch size of 100.
+The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with batch size of 1000 and 10000, respectively.
+KMeans-5 runs  31.1\% and 35.2\% faster with batch size of 1000 and 10000, respectively.
+
+\begin{figure}[t]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/SIFTQuery-Time}
+\caption {Query performance profile of the geometry mapping with four indexing strategies
+    \label{fig:sift-query}
+}
+\end{center}
+\end{figure}
 
 Figure~\ref{fig:sift-time} presents the end-to-end performance of this workload with a detailed runtime decomposition. For each data point, 
 we run it three times and present the average. 
@@ -974,26 +1007,29 @@ we run it three times and present the average.
 \end{center}
 \end{figure}
 
-Without lineage tracking, the workload takes 61.3~seconds to finish without lineage tracking, shown as the baseline.
-Tracking metadata mapping (geometry mapping) incurs a 89.8~seconds overhead in average. 
-Building the index for geometry mapping takes 33.9, 69.9, and 349.0~seconds for RTree, KMeans-1, and KMeans-5.
+Capturing 300 million geometry mappings takes 89.8~seconds overhead in average. 
+Building the index for these mappings takes 33.9, 69.9, and 349.0~seconds for RTree, KMeans-1, and KMeans-5.
 The Direct strategy crashes due to insufficient memory.
 
-Figure~\ref{fig:sift-query} presents the query performance with these indexing strategies.
-For each strategy, we run queries with {1, 100, 1000, 10000} batch size.
-NoIndex strategy perform worst among the four strategies, the query latency quickly grow over 10,000~ms with batch size of 100.
-The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with batch size of 1000 and 10000, respectively.
-KMeans-5 runs  31.1\% and 35.2\% faster with batch size of 1000 and 10000, respectively.
+Table~\ref{tb:sift-index-resource} presents the additional memory usage, storage space for mappings and
+index separately.
 
-
-\begin{figure}[t]
+\begin{table}[t]
 \begin{center}
-    \includegraphics[width=85mm]{pictures/SIFTQuery-Time}
-\caption {Query performance profile of the geometry mapping with four indexing strategies
-    \label{fig:sift-query}
-}
-\end{center}
-\end{figure}
+    \caption{Summary of Additional Memory Usage, Mapping Storage Space, and Index Storage Space for the Four Indexing Strate}
+    \begin{scriptsize}
+    \begin{tabular}{ | c | c | c | c |}
+    \hline
+    Index & Additional  Mem & Mapping Space & Index Space \\ \hline \hline
+    NoIndex & 71.4\% & 30.8~GB & 0 \\ \hline
+    RTree & 85.7\% & 30.8~GB & 24.6~GB\\ \hline
+    KMeans-1 & 85.7\% & 30.8~GB & 3.5~BG\\ \hline
+    KMeans-5 & 114.3\% & 30.8~GB & 3.5~GB\\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:sift-index-resource}
+\end{center}   
+\end{table}
 
 The storage consumption of the four indexing strategies is 30.8GB, 55.4GB, 34.3GB, and 34.3GB 
 for NoIndex, RTree, KMeans-1, KMeans-5, respectively. 
@@ -1009,92 +1045,75 @@ Since storage is not the major bottleneck given the machine capability, SystemX 
 as default, leaving the RTree strategies as users' options.
 
 
-
-%\subsection{End-to-end Pipeline Performance}
-%We use three ML pipelines to measure the end-to-end performance and its penalty with lineage capturing
-%along with resource consumption of memory and storage on a 16 machine cluster.
-%For each pipeline, we collect both the metadata mapping, the input dataset of the first transformer,  and the output dataset of all transformers.
-%Table~\ref{tb:apps-overhead} presents the measure numbers, for each data point in the table, it is an
-%average of three executions. 
-
-%The measurement shows a performance penalty range of 25.6\%-62.2\%, this performance penalty is comparable to that
-%of previous works of RAMP (16$\sim$76\%), Newt (20$\sim$50\%), and SubZero(20\%$\sim$150\%).
-%The memory usage overhead comparing to the baseline case is 200\% for MNIST pipeline, however it is using only
-%193~GB out of 3.9~TB memory space. 
-%For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (1.6~TB), the additional usage is 38.5\% and 43.7\%, respectively.
-
-%\begin{table}[t]
-%\begin{center}
-%    \caption{Overhead Profile of SystemX on the SIFTFisher, SourceExtractor, and MNIST Pipelines}
-%    \begin{scriptsize}
-%    \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | p{1.5cm} | }
-%    \hline
-%    Pipeline & SIFTFisher & SourceExtractor & MNIST  \\ \hline \hline
-%    Baseline & 780.8s & 279.7s & 56.4s \\ \hline
-%    Perf Penalty & 38.4\% & 25.6\% & 62.2\%   \\ \hline
-%    Memory & 38.5\% & 43.7\% & 200\%\\ \hline
-%    Mapping Size & 109.9~GB & 204.4~MB & 78.9~MB \\ \hline
-%    In\&Out dataset Size & 615.7~GB & 506.9~GB & 11.8~GB\\ \hline
-%    \end{tabular}
-%    \end{scriptsize}
-%    \label{tb:apps-overhead}
-%\end{center}   
-%\end{table}
-
-\subsection{Scalability}
-We evaluate the wall clock time overhead introduced by the lineage capturing systems with 
-the SIFTFisher and SourceExtractor pipelines. 
-The goal is to evaluate if this overhead is scalable with larger cluster size in a strong scaling manner.
+\subsection{Lineage Capturing Scalability}
+We evaluate lineage capturing performance with the SIFTFisher and SourceExtractor pipelines. 
+The goal is to evaluate if lineage capturing is scalable with larger cluster size in a strong scaling manner.
 For each pipeline, we measure the wall clock time of lineage capturing with two settings.
-With the first setting, SystemX only captures the metadata mapping, since this is the minimal lineage information 
+With the first setting (meta-only), SystemX only captures the metadata mapping, since this is the minimal lineage information 
 to preserve the pipeline lineage integrity.
-With the second setting, SystemX captures both the metadata mapping and the output dataset of each transformer.
+With the second setting (meta+data), SystemX captures both the metadata mapping and the output dataset of each transformer.
 With the lineage information captured in this way, queries on the output dataset does not require any rerunning of data transformations.
-And this is considered the maximal lineage information of a pipeline. 
+And this is considered as the maximal lineage information of a pipeline. 
+Table~\ref{tb:apps-stats} presents the the dataset size collected with both settings for both pipelines.
 
-Figure~\ref{fig:VOC-overhead} shows the isolated wall clock time overhead for the meta-only and meta+data
+\begin{table}[t]
+\begin{center}
+    \caption{Data Size of SIFTFisher and SourceExtractor with the Meta-only and Meta+Data settings}
+    \begin{scriptsize}
+    \begin{tabular}{ | c | c | c| }
+    \hline
+    Pipeline & SIFTFisher & SourceExtractor \\ \hline \hline
+    Meta-only & 109.9~GB & 204.4~MB \\ \hline
+    Meta+Data & 615.7~GB & 506.9~GB \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:apps-stats}
+\end{center}   
+\end{table}
+
+Figure~\ref{fig:VOC-overhead} shows the isolated wall clock time of lineage capturing performance for the meta-only and meta+data
 settings. From small scale to large scale, the meta-only setting scales up to 16 machines then flattens. 
 On the other hand, the meta+data setting shows a better scalability since this is a relatively more
 data-intensive procedure compared to the meta-only setting. 
-By examining the pipeline scalability, we confirm that the the scalability of the meta-only setting is bounded
+By examining the pipeline measurements, we confirm that the the scalability of the meta-only setting is bounded
 by the pipeline performance.
+From 4 to 8 machines, the meta-only setting shows a super linear speedup, this is because the pipeline is memory-bounded on 4 machines
+and using 8 machines removes this bottleneck.
+
 \begin{figure}[t]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Overhead-Time-VOC}
-\caption {Isolated Lineage Capturing Wall Clock Time Overhead of the SIFTFisher Pipeline
+\caption {Isolated Lineage Capturing Wall Clock Time of the SIFTFisher Pipeline
     \label{fig:VOC-overhead}
 }
 \end{center}
 \end{figure}
 
-Figure~\ref{fig:SE-overhead} shows the isolated wall clock time overhead for the meta-only and meta+data settings.
+Figure~\ref{fig:SE-overhead} shows the isolated wall clock time lineage capturing for the meta-only and meta+data settings.
 By profiling the SourceExtractor performance, we observe that this pipeline's runtime only improves by 5.5\% from 8 machines
-to 16 machines. Then the performance starts to slow down with more machines.
+to 16 machines. Then the performance starts to slow down with more machines due to the small input file size and short task runtime.
 Given the poor scalability of the SourceExtractor pipeline, the meta-only setting performance is bounded by the pipeline performance.
 While the Meta+Data setting scales better due to its nature of data intensiveness.
 \begin{figure}[t]
 \begin{center}
     \includegraphics[width=85mm]{pictures/Overhead-Time-SE}
 \caption {Isolated Lineage Capturing Wall Clock Time Overhead of the SourceExtractor Pipeline
-    \label{fig:VOC-overhead}
+    \label{fig:SE-overhead}
 }
 \end{center}
 \end{figure}
 
-One pattern we can conclude from the scalability measurements is that SystemX scales no worse than the ML pipelines.
-This is due to the fact that SystemX captures and stores the lineage information via the RDD abstraction, which perform
-in a scalable manner. 
+One pattern we can conclude from the scalability measurements is that SystemX's lineage capturing performance scales no worse than the ML pipelines.
+This is due to the fact that SystemX captures and stores the lineage in a distributed manner with the RDD data structure. 
 The metadata mapping capturing is more likely to be impacted by the ML pipeline comparing to the case where both metadata
 mapping and datasets are captured, since it is a relatively less data-intensive operations.
-Combining pipeline stats shown in Table~\ref{tb:apps-overhead}, SystemX scales  well when collecting larger datasets.
-In the SIFTFisher case, capturing both metadata mapping and datasets shows scalability that is higher than ideal.
-This is because the SIFTFisher performance is memory-bounded on 8 machines, once the memory bound is relieved, the actual performance
-exceeds the expectation.
+
 
 \subsection{Query Performance}
 In some cases, a user is only interested in one element of a single transformer.
 The query is then in the form of random query with a single key.
-While inn the chained lineage case, an individual element query on a transformer can return a large number of coordinates, e.g., on the order of 1M. 
+While with the chained lineage (a sequence of transformers), an individual element query 
+on a transformer can return a large number of coordinates, e.g., on the order of 1M. 
 The subsequent query then uses these 1M coordinates as keys.
 And this large number of key size can impact the query performance substantially.  
 This performance measurement seeks to profile the boundary of query scalability in SystemX. 
@@ -1117,7 +1136,7 @@ Table~\ref{tb:typequery-stats} shows the metadata settings of the input and outp
 \begin{center}
     \caption{Data Structure Settings}
     \begin{scriptsize}
-    \begin{tabular}{ | p{1.5cm} | p{3cm} | p{3cm} |}
+    \begin{tabular}{ | c | c | c |}
     \hline
     Type & Input Structure & Output Structure \\ \hline \hline
     All & Vector(40960) & Vector(40960) \\ \hline
