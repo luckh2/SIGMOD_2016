@@ -771,9 +771,9 @@ meaning the inverse of these two mappings are also all mapping, identity mapping
 lincom mapping and join mapping respectively.
 
 {\bf Collapse mapping} and {\bf expansion mapping} are not symmetric, but the mapping inversion can be inferred
-given the data structure metadata (the number and size of dimensions of a n-dimensional space). For example, 
+given the data structure metadata (the number and size of dimensions of an n-dimensional space). For example, 
 in the collapse case shown early in Figure~\ref{fig:narrowmapping}, a matrix with three rows and three columns
-collapses into a vector along the row dimension. Thus a mapping inversion of an element of of the vector
+collapses into a vector along the row dimension. Thus a mapping inversion of an element of the vector
 is all elements in the corresponding row in the matrix. 
 The inversion of expansion mapping can also be inferred with simple calculation.
 The inversion of geometry mapping is enabled by switch the order of the order of each geometry pairs.
@@ -787,7 +787,7 @@ map spaces that have different dimensions. By definition, they only maps from a 
 A transformer that reduces a lower-dimensional space to a higher-dimensional space, e.g., transforming a vector into a matrix, can use
 the same ExpansionLineage type for declaration based on the fact that the reverse mapping of this transformation is a
 expansion mapping. SystemX can infer the mapping direction based on the metadata of data structures 
-(the number and size of dimensions of a n-dimensional space). 
+(the number and size of dimensions of an n-dimensional space). 
 A similar solution is used for the reverse of collapse mapping.
 
 For sampling transformers, e.g., selecting a subset of a vector collection, SystemX implements it as a geometry mapping.
@@ -818,7 +818,7 @@ In this section, we discuss four indexing strategies to speedup the query over t
 An empirical performance study is presented in \S\ref{sec:Perf-Index}.
 The four indexing strategies are referred as {\bf NoIndex}, {\bf Direct}, {\bf RTree}, and {\bf KMeans}, respectively.
 For simplicity, only forward query from the input to the output is discussed in this section.
-The backward query works in a similar way by reverting the the geometry tuple.
+The backward query works in a similar way by reverting the geometry tuple.
 
 
 Figure~\ref{fig:example} shows the example that is used in the following discussion.
@@ -857,8 +857,8 @@ The time complexity of a query is $O(k)$, where $k$ is the number of circles.
 
 \subsubsection{Direct Index}
 To build the {\bf Direct} index, SystemX uses each input element as key and the associated geometry as the value, as shown in Figure~\ref{fig:direct}.
-SystemX relies on the underlying runtime system for the optimization of storing repeated geometries as an single object,
-then using an pointer (hash value of the object) to point to the geometry object, as shown in Figure~\ref{fig:direct-optimized}.
+SystemX relies on the underlying runtime system for the optimization of storing repeated geometries as a single object,
+then uses a pointer (hash value of the object) to point to the geometry object, as shown in Figure~\ref{fig:direct-optimized}.
 A query of an element takes two steps: the first step returns the hash value for that element and the second step returns the rectangle. 
 The space complexity of {\bf Direct} index is $O(k*N)$, where $k$ is the number of circles and $N$ is the number of elements in each circle.
 For simplicity, the space complexity of the {\bf Direct} index is $O(N^2)$.
@@ -901,13 +901,13 @@ The index is built upon the bounding boxes.
 The query of an input element (0,0) in the R-tree returns a tuple of the bounding box (center: (0.5,0.5), height:1, width:1) and circle\_0.
 The query returns the output elements expanded from Rect\_0 only if the input element is within circle\_0.
 
-The time complexity of building a R-tree is $log(N)$.
-The worst case time complexity of query a R-tree is $O(N)$.
+The time complexity of building an R-tree is $log(N)$.
+The worst case time complexity of query an R-tree is $O(N)$.
 And the space complexity for {\bf RTree} index is $log(N)$.
 
 \subsubsection{KMeans Index}
 We design a two-layer tree index with its leaf nodes as a list of geometries and its non-leaf nodes as the bounding box (same idea as that of R-tree)
-of the geometry list.
+of all geometries in the list.
 The geometries are distributed to each non-leaf node using the KMeans~\cite{macqueen67} algorithm.
 
 This {\bf KMeans} strategy clusters $N$ geometries into $\sqrt{N}$ clusters, 
@@ -1042,7 +1042,7 @@ index separately.
 
 \begin{table}[t]
 \begin{center}
-    \caption{Summary of Additional Memory Usage, Mapping Storage Space, and Index Storage Space for the Four Indexing Strate}
+    \caption{Summary of Additional Memory Usage, Mapping Storage Space, and Index Storage Space for the Four Indexing Strategies}
     \begin{scriptsize}
     \begin{tabular}{ | c | c | c | c |}
     \hline
@@ -1074,7 +1074,7 @@ to preserve the pipeline lineage integrity.
 With the second setting (meta+data), SystemX captures both the metadata mapping and the output dataset of each transformer.
 With the lineage information captured in this way, queries on the output dataset does not require any rerunning of data transformations.
 This is considered as the maximal lineage information of a pipeline. 
-Table~\ref{tb:apps-stats} presents the the dataset size collected with both settings for both pipelines.
+Table~\ref{tb:apps-stats} presents the dataset size collected with both settings for both pipelines.
 
 \begin{table}[t]
 \begin{center}
@@ -1095,7 +1095,7 @@ Figure~\ref{fig:VOC-overhead} shows the isolated wall clock time of lineage capt
 settings. From small scale to large scale, the meta-only setting scales up to 16 machines then flattens. 
 On the other hand, the meta+data setting shows a better scalability since this is a relatively more
 data-intensive procedure compared to the meta-only setting. 
-By examining the pipeline measurements, we confirm that the the scalability of the meta-only setting is bounded
+By examining the pipeline measurements, we confirm that the scalability of the meta-only setting is bounded
 by the pipeline performance.
 From 4 to 8 machines, the meta-only setting shows a super linear speedup, this is because the pipeline is memory-bounded on 4 machines
 and using 8 machines removes this bottleneck.
@@ -1183,7 +1183,7 @@ Beyond that, a query with 10K keys takes $2.41\pm0.6$~seconds and a query with 1
 This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of a single transformer. 
 However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~seconds boundary. 
 This is a problem for end-to-end pipeline lineage investigation with a sequence of data transformations.
-One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm 0.05$ for forward query.
+One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm0.05$ for forward query.
 While in the case of SIFTFisher pipeline,  it can take an estimated $O(10^3)$~seconds to finish as the backward query on the SIFTExtractor
 transformer has a key size of 7.7M from a matrix with 128 rows and 60K columns to an image with 333 rows, 500 columns and 3 channels. 
 For the moment, we put this large scale query optimization as future work.
@@ -1200,7 +1200,7 @@ datasets of the last step. By joining the metadata mapping with output datasets,
 objects with a threshold brightness. Then the user queries the metadata mapping to find the positions of corresponding pixels in the input images.
 This instrumentation introduces a wall clock time overhead of 40.8\% on a 8 machine cluster. 
 Filtering {\it luminous flux >300,000~lumen} over 1 million objects returns 10,283 objects
-with its corresponding pixel positions in $1.84\pm0.14$~seconds. 
+with the corresponding pixel positions in $1.84\pm0.14$~seconds. 
 A forward query that traces the error propagation given a bad pixel takes $3.3\pm0.03$~seconds to return.
 
 In the {\bf data cleaning} use case, the user of the SIFTFisher pipeline wants to remove the training images that have both the dogs and cats.
@@ -1217,7 +1217,7 @@ time by 16.4x (from $421.3\pm3.8$~seconds to $25.7\pm0.3$~seconds).
 \label{sec:Related}
 {\bf Coarse-grained Lineage:} Researchers have extensively studied data lineage (in some cases referred as data provenance) in different contexts.
 Scientific workflow systems such as  Chimera~\cite{foster02}, Taverna~\cite{oinn02}, and ESSW~\cite{frew01}, 
-collect coarse-grained lineage of file metadata and computation. 
+collects coarse-grained lineage of file metadata and computation. 
 Similar work has been well summarized by survey~\cite{simmhan05, freire08, bose05}.
 Recent work~\cite{altintas10} investigates how to integrate the lineage of workflow executions
 in a collaborative environment. Coarse-grained lineage is useful in these systems to trace the data and code dependencies.
@@ -1233,8 +1233,10 @@ RDMBS has its SQL operators. MapReduce systems formulates the computation as map
 The curated database defines four operators of insert, delete, copy and paste.
 Though lineage capturing interface designed in these systems is general to support all applications running on top these systems,
 it exposes very limited flexibility of lineage type declaration and instrumentation to users.
-In contrast, an ML pipeline can be viewed as a chain of user-defined data transformations, and the users often have the knowledge 
-of lineage types and data of interest since they are the designers of the pipeline. 
+In contrast, ML frameworks do not have such a set of well-regulated low level operators, 
+and an ML pipeline can be viewed as a chain of user-defined data transformations.
+Though the designers of the pipeline have the knowledge of lineage types and data of interest,
+the existing lineage system capturing interfaces do not expose specification and instrumentation flexibility to users. 
 
 One of SubZero's contributions is the region lineage that collects fine-grained lineage for UDFs besides the built-in operators in SciDB. 
 However, region lineage is not sufficient for ML pipelines because it only captures many to one relationships between input and output cells, 
