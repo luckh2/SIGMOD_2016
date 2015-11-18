@@ -1010,53 +1010,76 @@ as default, leaving the RTree strategies as users' options.
 
 
 
-\subsection{End-to-end Pipeline Performance}
-We use three ML pipelines to measure the end-to-end performance and its penalty with lineage capturing
-along with resource consumption of memory and storage on a 16 machine cluster.
-For each pipeline, we collect both the metadata mapping, the input dataset of the first transformer,  and the output dataset of all transformers.
-Table~\ref{tb:apps-overhead} presents the measure numbers, for each data point in the table, it is an
-average of three executions. 
+%\subsection{End-to-end Pipeline Performance}
+%We use three ML pipelines to measure the end-to-end performance and its penalty with lineage capturing
+%along with resource consumption of memory and storage on a 16 machine cluster.
+%For each pipeline, we collect both the metadata mapping, the input dataset of the first transformer,  and the output dataset of all transformers.
+%Table~\ref{tb:apps-overhead} presents the measure numbers, for each data point in the table, it is an
+%average of three executions. 
 
-The measurement shows a performance penalty range of 25.6\%-62.2\%, this performance penalty is comparable to that
-of previous works of RAMP (16$\sim$76\%), Newt (20$\sim$50\%), and SubZero(20\%$\sim$150\%).
-The memory usage overhead comparing to the baseline case is 200\% for MNIST pipeline, however it is using only
-193~GB out of 3.9~TB memory space. 
-For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (1.6~TB), the additional usage is 38.5\% and 43.7\%, respectively.
+%The measurement shows a performance penalty range of 25.6\%-62.2\%, this performance penalty is comparable to that
+%of previous works of RAMP (16$\sim$76\%), Newt (20$\sim$50\%), and SubZero(20\%$\sim$150\%).
+%The memory usage overhead comparing to the baseline case is 200\% for MNIST pipeline, however it is using only
+%193~GB out of 3.9~TB memory space. 
+%For more memory-intensive pipelines of SIFTFisher (1.3~TB) and SourceExtractor (1.6~TB), the additional usage is 38.5\% and 43.7\%, respectively.
 
-\begin{table}[t]
-\begin{center}
-    \caption{Overhead Profile of SystemX on the SIFTFisher, SourceExtractor, and MNIST Pipelines}
-    \begin{scriptsize}
-    \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | p{1.5cm} | }
-    \hline
-    Pipeline & SIFTFisher & SourceExtractor & MNIST  \\ \hline \hline
-    Baseline & 780.8s & 279.7s & 56.4s \\ \hline
-    Perf Penalty & 38.4\% & 25.6\% & 62.2\%   \\ \hline
-    Memory & 38.5\% & 43.7\% & 200\%\\ \hline
-    Mapping Size & 109.9~GB & 204.4~MB & 78.9~MB \\ \hline
-    In\&Out dataset Size & 615.7~GB & 506.9~GB & 11.8~GB\\ \hline
-    \end{tabular}
-    \end{scriptsize}
-    \label{tb:apps-overhead}
-\end{center}   
-\end{table}
+%\begin{table}[t]
+%\begin{center}
+%    \caption{Overhead Profile of SystemX on the SIFTFisher, SourceExtractor, and MNIST Pipelines}
+%    \begin{scriptsize}
+%    \begin{tabular}{ | p{1.8cm} | p{1.8cm} | p{1.8cm} | p{1.5cm} | }
+%    \hline
+%    Pipeline & SIFTFisher & SourceExtractor & MNIST  \\ \hline \hline
+%    Baseline & 780.8s & 279.7s & 56.4s \\ \hline
+%    Perf Penalty & 38.4\% & 25.6\% & 62.2\%   \\ \hline
+%    Memory & 38.5\% & 43.7\% & 200\%\\ \hline
+%    Mapping Size & 109.9~GB & 204.4~MB & 78.9~MB \\ \hline
+%    In\&Out dataset Size & 615.7~GB & 506.9~GB & 11.8~GB\\ \hline
+%    \end{tabular}
+%    \end{scriptsize}
+%    \label{tb:apps-overhead}
+%\end{center}   
+%\end{table}
 
 \subsection{Scalability}
-We use the same three ML pipelines and execute them on clusters with {8, 16, 32, 64} of machines.
-We measure the performance of the baseline (without lineage), lineage with only metadata mapping, 
-and lineage with both metadata mapping and datasets. 
-Then we isolate the SystemX's overhead from the pipelines and show the relative scalability
- to the performance of 8 machines, shown as Figure~\ref{fig:scalability}.
+We evaluate the wall clock time overhead introduced by the lineage capturing systems with 
+the SIFTFisher and SourceExtractor pipelines. 
+The goal is to evaluate if this overhead is scalable with larger cluster size in a strong scaling manner.
+For each pipeline, we measure the wall clock time of lineage capturing with two settings.
+With the first setting, SystemX only captures the metadata mapping, since this is the minimal lineage information 
+to preserve the pipeline lineage integrity.
+With the second setting, SystemX captures both the metadata mapping and the output dataset of each transformer.
+With the lineage information captured in this way, queries on the output dataset does not require any rerunning of data transformations.
+And this is considered the maximal lineage information of a pipeline. 
 
-\begin{figure*}[t]
+Figure~\ref{fig:VOC-overhead} shows the isolated wall clock time overhead for the meta-only and meta+data
+settings. From small scale to large scale, the meta-only setting scales up to 16 machines then flattens. 
+On the other hand, the meta+data setting shows a better scalability since this is a relatively more
+data-intensive procedure compared to the meta-only setting. 
+By examining the pipeline scalability, we confirm that the the scalability of the meta-only setting is bounded
+by the pipeline performance.
+\begin{figure}[t]
 \begin{center}
-    \includegraphics[width=120mm]{pictures/Scalability}
-\caption {Relative Speedup of the VOCSIFTFisher, Source Extractor, and MNIST Pipelines with SystemX over Eight Nodes.
-Speedup is measured by isolating SystemX's overhead.
-    \label{fig:scalability}
+    \includegraphics[width=85mm]{pictures/Overhead-Time-VOC}
+\caption {Isolated Lineage Capturing Wall Clock Time Overhead of the SIFTFisher Pipeline
+    \label{fig:VOC-overhead}
 }
 \end{center}
-\end{figure*}
+\end{figure}
+
+Figure~\ref{fig:SE-overhead} shows the isolated wall clock time overhead for the meta-only and meta+data settings.
+By profiling the SourceExtractor performance, we observe that this pipeline's runtime only improves by 5.5\% from 8 machines
+to 16 machines. Then the performance starts to slow down with more machines.
+Given the poor scalability of the SourceExtractor pipeline, the meta-only setting performance is bounded by the pipeline performance.
+While the Meta+Data setting scales better due to its nature of data intensiveness.
+\begin{figure}[t]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/Overhead-Time-SE}
+\caption {Isolated Lineage Capturing Wall Clock Time Overhead of the SourceExtractor Pipeline
+    \label{fig:VOC-overhead}
+}
+\end{center}
+\end{figure}
 
 One pattern we can conclude from the scalability measurements is that SystemX scales no worse than the ML pipelines.
 This is due to the fact that SystemX captures and stores the lineage information via the RDD abstraction, which perform
