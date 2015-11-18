@@ -54,7 +54,7 @@
 \usepackage{dblfloatfix}
 \usepackage{fixltx2e}
 \usepackage{listings}
-\lstset{language=sql, escapeinside={\$}, basicstyle=\footnotesize\ttfamily, mathescape, escapeinside={\%*}{*)}}
+\lstset{language=sql, escapeinside={\$}, basicstyle=\small, mathescape, escapeinside={\%*}{*)}}
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{corollary}{Corollary}[theorem]
@@ -253,7 +253,7 @@ In summary, we make the following contributions:
 \item{} We present three real use cases of using fine-grained data lineage for code validation, results inspection, and data cleaning, respectively.
 \end{shortlist}
 
-\section{Functional Requirements}
+\section{S\MakeLowercase{ystem}X Framework}
 \label{sec:functional}
 Two basic functions of SystemX are lineage capturing and serving.
 SystemX requires a programming interface between the users of KeystoneML and the lineage capturing unit to 
@@ -263,94 +263,11 @@ This interface should also be powerful in terms of data transformation coverage.
 This interface should be flexible so that users can define their own lineage type and instrumentation.
 
 To serve lineage for query, SystemX requires a user interface to reconstruct and chain collected lineage.
-Each transformer should provide the forward query (qForward()) and backward query (qBackward()) functionality.
+Each transformer should provide the forward query ({\bf qForward()}) and backward query ({\bf qBackward()}) functionality.
 SystemX needs to verify the chained lineage has identical ordering to the pipeline.
 The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
 the lineage contains enough information with which users can reproduce the results.
 In turn, a partial pipeline assembled by a sequence of transformers of the original pipeline should be able to be replayed deterministically.
-
-\section{Use Cases and K\MakeLowercase{eystone}ML}
-\label{sec:Background}
-To motivate SystemX, we present three representative use cases of using fine-grained lineage for ML pipeline diagnostics.
-A brief review of KeystoneML is presented to help understand the technical background of this work.
-
-\subsection{Use Cases}
-\label{sec:Back-cases}
-The three use cases come from real ML pipelines of image classification and astronomy image processing. 
-These three cases are representative for code validation, results inspection, and data cleaning, respectively.
-
-\subsubsection{Code Validation}
-In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
-Typical machine learning workflows are constructed via an iterative process of refinement with a machine learning developer or data scientist in the loop.
-These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
-Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
-
-
-\begin{figure*}[t]
-\begin{center}
-    \includegraphics[width=150mm]{pictures/VOCSIFTFisher}
-    \caption {The SIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
-    \label{fig:vocsiftfisher}
-}
-\end{center}
-\end{figure*}
-
-As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
-It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
-However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
-By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
-By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
-
-
-\subsubsection{Results Inspection}
-Users of ML pipelines often interpret the results, identify some potential data anomalies, then retrospect the supporting input data for better understanding.
-Fine-grained data lineage of ML pipelines have sufficient information for such investigation.
-
-\begin{figure}[ht]
-\begin{center}
-    \includegraphics[width=85mm]{pictures/SourceExtractor}
-    \caption {The SourceExtractor pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
-    \label{fig:sourceextractor}
-}
-\end{center}
-\end{figure}
-
-One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
-that processes images from the telescopes and produces astronomical object catalogs. 
-The astronomical object catalog includes the position, shape, and other statistical properties of the object.
-In this case, astronomers find the bright objects over a threshold and validate that these objects are indeed astronomical objects rather
-than noise caused by cosmic rays.
-With the lineage information, astronomers can first filter the results to find the objects whose brightness is above a threshold.
-Then using backward query, they can find corresponding pixels for these bright objects. 
-Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
-Then the astronomer can use forward query to figure how a bad pixel propagates to the results in the catalogs.
-
-\subsubsection{Data Cleaning}
-\label{sec:Back-Case-Cleaning}
-Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
-The ML expert who is building a SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, identifies bad 
-training data items due to measurement error (e.g. the images that have both dogs and cats). A natural 
-investigation is then to remove these images, and test if that improves prediction accuracy.
-
-With SystemX, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
-directly into KeystoneML, filter out the data items that are derived from the images with both dogs and cats , 
-and apply the filtered dataset directly to the linear solver.
-In this way, the rerunning process can bypass the expensive data preparation procedure (from PixelScaler to RowNormalizer) 
-resulting in shorter turnaround time.
-Without lineage information, the user has to remove the according images from the training set and rerun data
-preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
-
-
-\subsection{KeystoneML}
-In principle, SystemX is general for distributed ML frameworks whose programming interface can be abstracted as transformers and estimators.
-We integrate SystemX with KeystoneML to show the effectiveness of the design.
-KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
-
-
-\section{Formal Discussion}
-\label{sec:Mapping}
-In this section, we formally define the notion of an ML pipeline, dataset, mapping and its associated operations of query in the context of 
-relational database.
 
 \subsection{Pipeline and Datasets}
 \label{sec:Map-Pipe-Data}
@@ -371,7 +288,8 @@ Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{i+1}
 $I_{i+1} = T_i(I_i)$. 
 Especially, the output of the whole pipeline is denoted as $O = I_{n+1}$
 
-To simplify the discussion, we only present the definition of forward query given that 
+To simplify the discussion, we use the vector collection (a 2D space) as the input and output data structures in the following discussion.
+Also we only present the definition of forward query given that 
 backward query can be inducted by reversing the table order in the join operation.
 
 \subsection{Dataset and Mapping}
@@ -379,33 +297,9 @@ backward query can be inducted by reversing the table order in the join operatio
 Conceptually, the input dataset and output dataset can be defined
 as tables with each element's coordinate in the data structure as key.
 \begin{lstlisting}
-input(Coor, Value)
-output(Coor, Value)
+input(Coor:(Int,Int), Value:Double)
+output(Coor:(Int,Int), Value:Double)
 \end{lstlisting}
-
-%\newline\newline
-%\noindent\begin{minipage}{\textwidth}
-%\noindent\begin{minipage}{.2\textwidth}
-%\begin{verbatim}
-%CREATE TABLE input
-%(
-%  Meta (INT, INT),
-%  Value (DOUBLE)
-%);
-%\end{verbatim}
-%\end{minipage} 
-%\qquad{\color{black}\vrule}\qquad
-%\begin{minipage}{.2\textwidth}
-%\begin{verbatim}
-%CREATE TABLE output
-%(
-%  Meta (INT, INT),
-%  Value (DOUBLE)
-%);
-%\end{verbatim}
-%\end{minipage}
-%\end{minipage}
-%\vspace{2ex}
 
 The mapping between the input and output dataset is a left outer join of the the two tables with a mapping function.
 The Func() function returns the corresponding output elements given an input element. 
@@ -419,7 +313,7 @@ LEFT OUTER JOIN output
 In practice, SystemX separates the metadata from the actual element values and only record metadata mapping
 in a table.
 \begin{lstlisting}
-mapping(inCoor, outCoor)
+mapping(inCoor:(Int,Int), outCoor:(Int,Int))
 \end{lstlisting}
 
 \begin{lstlisting}
@@ -440,7 +334,7 @@ LEFT OUTER JOIN output
 The input and output mapping of a pipeline is in turn a sequence of mappings of individual transformer.
 Consider a pipeline $P=(T_1, T_2, ..., T_n)$, we denote $mapping_i$ as the mapping table for transformer $T_i$.
 The mapping of the pipeline is a sequence of left outer join operations of $\{mapping_1, ..., mapping_n\}$ 
-\newline on $mapping_i.outCoor = mapping_{i+1}.inCoor$.
+on $mapping_i.outCoor = mapping_{i+1}.inCoor$.
 
 \subsection{Mapping Function}
 \label{sec:Map-Func}
@@ -474,37 +368,141 @@ on the collection (RDD) position.
 For the mappings that are not covered by the primitive functions, SystemX allows users to define their own mapping functions.
 
 \subsection{Mapping Query}
-A forward query with a key  ({\it qForward(key)}) over the mapping of a transformer or a pipeline can be expressed as:
+A forward query with a key  ({\bf qForward(key)}) over the mapping of a transformer or a pipeline can be expressed as:
 \begin{lstlisting}
 SELECT outCoor FROM mapping
 WHERE key = inCoor;
 \end{lstlisting}
 
-A forward query with a list of $keys=\{k_1, k_2, ..., k_n\}$ ({\it qForward(keys)}) can be expressed as:
+A forward query with a list of $keys=\{k_1, k_2, ..., k_n\}$ ({\bf qForward(keys)}) can be expressed as:
 \begin{lstlisting}
 SELECT outCoor FROM mapping
 WHERE $k_1$ = inCoor OR ... OR $k_n$ = inCoor;
 \end{lstlisting}
 
-\subsection{Data Preparation Skipping}
-\label{sec:formal-skipping}
-In use cases such as data cleaning presented in \S\ref{sec:Back-Case-Cleaning}, users want
-to remove certain suspicious input data items that might relate to bad prediction results and retrain the model then
-test its performance. 
-Repeating the data preparation steps (e.g., from PixelScaler to RowNormalizer in SIFTFisher pipeline) incurs
-long running time.
-One natural thought in such case is ``can we skip the computation applied on the unchanged data items by removing
-the corresponding prepared data items directly?''
+\section{Use Cases and K\MakeLowercase{eystone}ML}
+\label{sec:Background}
+To motivate SystemX, we present three representative use cases of using fine-grained lineage for ML pipeline diagnostics.
+A brief review of KeystoneML is presented to help understand the technical background of this work.
 
-Formally, given a data transformation {\it f()} applied on a set $C$ of vectors \{$v_1, v_2, ..., v_n$\}.
-we say it is safe to remove {\it f($v_i$)} if {\it $f(C \setminus {v_i})) = f(C) \setminus {f(v_i)}$}.
-In other words, function {\it f()} is distributive on vectors \{$v_1, v_2, ..., v_n$\}. 
-With single or few transformers, users are able to track the distributive property.
-However when the pipeline is deep, such a property is hard to track.
+\subsection{Use Cases}
+\label{sec:Back-cases}
+The three use cases come from real ML pipelines of image classification and astronomy image processing. 
+These three cases are representative for code validation, results inspection, and data cleaning, respectively.
 
-Using the fine-grained data lineage, we present a validation method for the distributive property.
-The mapping of {\it f()} is self-contained if $qBackward_f(qForward_f(v_i)) \subseteq v_i$, where vector $v_i$ can be viewed 
-as a set of one-dimensional elements.
+\subsubsection{Code Validation}
+In this use case we use lineage as a tool in the debugging process as pipelines change and are augmented. 
+Typical machine learning workflows are constructed via an iterative process of refinement with a machine learning developer or data scientist in the loop.
+These users are constantly engineering new features, adding new datasources, and trying out new machine learning methods at all stages of the pipeline.
+Lineage offers a natural way for these users to hone in on the areas where two similar pipelines diverge in terms of their intermediate data, and presents a new avenue for investigation of model performance by allowing users to pinpoint the point at which their data diverged from a known good pipeline and to inspect \emph{what} changed during the data processing procedure. 
+
+
+\begin{figure*}[t]
+\begin{center}
+    \includegraphics[width=150mm]{pictures/VOCSIFTFisher}
+    \caption {The SIFTFisher pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
+    \label{fig:vocsiftfisher}
+}
+\end{center}
+\end{figure*}
+
+As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
+It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
+However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
+By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
+By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
+The query for this use case is applied on the metadata mapping table of the SIFTExtractor transformer.
+\begin{lstlisting}
+mapping(inCoor:(Int,Int,Int),outCoor:(Int,Int,Int))
+
+SELECT inCoor FROM mapping WHERE inCoor = key;
+\end{lstlisting}
+
+\subsubsection{Results Inspection}
+Users of ML pipelines often interpret the results, identify some potential data anomalies, then retrospect the supporting input data for better understanding.
+Fine-grained data lineage of ML pipelines have sufficient information for such investigation.
+
+\begin{figure}[ht]
+\begin{center}
+    \includegraphics[width=85mm]{pictures/SourceExtractor}
+    \caption {The SourceExtractor pipeline, boxes are dataset, rounded-corner boxes are transformers, dashed rounded-corner boxes are estimators.
+    \label{fig:sourceextractor}
+}
+\end{center}
+\end{figure}
+
+One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
+that processes images from the telescopes and produces astronomical object catalogs. 
+The astronomical object catalog includes the position, shape, and other statistical properties of the object.
+In this case, astronomers find the bright objects over a threshold and validate that these objects are indeed astronomical objects rather
+than noise caused by cosmic rays.
+With the lineage information, astronomers can first filter the results to find the objects whose brightness is above a threshold.
+Then using backward query, they can find corresponding pixels for these bright objects. 
+Either through mathematical analysis or human intervention, they are able to validate the correctness of the bright objects.
+Then the astronomer can use forward query to figure how a bad pixel propagates to the results in the catalogs.
+The query for this use case can be expressed as following.
+\begin{lstlisting}
+output(Coor:(Int,Int,Int),Brightness:Double)
+mapping(inCoor:(Int,Int,Int),outCoor:(Int,Int,Int))
+
+SELECT mapping.inCoor FROM mapping 
+LEFT OUTER JOIN output
+  ON mapping.outCoor = output.Coor
+WHERE output.Brightness > threshold;
+\end{lstlisting}
+
+The forward query on the bad pixel propagation can be translated into the following code.
+\begin{lstlisting}
+SELECT outCoor FROM mapping WHERE inCoor = key;
+\end{lstlisting}
+
+\subsubsection{Data Cleaning}
+\label{sec:Back-Case-Cleaning}
+Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
+The ML expert who is building a SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, identifies bad 
+training data items due to measurement error (e.g. the images that have both dogs and cats). A natural 
+investigation is then to remove these images, and test if that improves prediction accuracy.
+
+With SystemX, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
+directly into KeystoneML, filter out the data items that are derived from the images with both dogs and cats , 
+and apply the filtered dataset directly to the linear solver.
+In this way, the rerunning process can bypass the expensive data preparation procedure (from PixelScaler to RowNormalizer) 
+resulting in shorter turnaround time.
+Without lineage information, the user has to remove the according images from the training set and rerun data
+preparation part (from PixelScaler to RowNormalizer), then feed the dataset to linear solver to train the model.
+
+
+\subsection{KeystoneML}
+In principle, SystemX is general for distributed ML frameworks whose programming interface can be abstracted as transformers and estimators.
+We integrate SystemX with KeystoneML to show the effectiveness of the design.
+KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
+
+
+%\section{Formal Discussion}
+%\label{sec:Mapping}
+%In this section, we formally define the notion of an ML pipeline, dataset, mapping and its associated operations of query in the context of 
+%relational database.
+
+
+%\subsection{Data Preparation Skipping}
+%\label{sec:formal-skipping}
+%In use cases such as data cleaning presented in \S\ref{sec:Back-Case-Cleaning}, users want
+%to remove certain suspicious input data items that might relate to bad prediction results and retrain the model then
+%test its performance. 
+%Repeating the data preparation steps (e.g., from PixelScaler to RowNormalizer in SIFTFisher pipeline) incurs
+%long running time.
+%One natural thought in such case is ``can we skip the computation applied on the unchanged data items by removing
+%the corresponding prepared data items directly?''
+%
+%Formally, given a data transformation {\it f()} applied on a set $C$ of vectors \{$v_1, v_2, ..., v_n$\}.
+%we say it is safe to remove {\it f($v_i$)} if {\it $f(C \setminus {v_i})) = f(C) \setminus {f(v_i)}$}.
+%In other words, function {\it f()} is distributive on vectors \{$v_1, v_2, ..., v_n$\}. 
+%With single or few transformers, users are able to track the distributive property.
+%However when the pipeline is deep, such a property is hard to track.
+%
+%Using the fine-grained data lineage, we present a validation method for the distributive property.
+%The mapping of {\it f()} is self-contained if $qBackward_f(qForward_f(v_i)) \subseteq v_i$, where vector $v_i$ can be viewed 
+%as a set of one-dimensional elements.
 
 
 \begin{theorem}
@@ -732,8 +730,8 @@ SystemX exposes a simple interface for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
 Using the high-order function involves an issue for query. 
-As both the input elements and output elements are encoded with a high-order function. 
-And the mapping between input function and output function is stored in a list. 
+Both the input elements and output elements are encoded with a high-order function, 
+and the mapping between input function and output function is stored in a list. 
 A forward query that takes an input element as key thus needs to iterate over all input functions and test if the key is in the function or not.
 If the key is in an input function, it then returns the mapping output function, and expands the function to a set of coordinates.
 The time complexity of query over geometry mapping is then $O(N^2)$, assuming there are $N$ tuples in the list and each input function expands to $N$ elements.
@@ -802,8 +800,8 @@ concatenating the transformer name and the initial input dataset identifier of t
 In this way, SystemX can tell between the training pipeline and test pipeline based on the input dataset identifier,
 if the training and testing are run in a single program given that the training and test datasets are distinct.
 
-For the datasets and mappings, SystemX write them to file system by calling {\it RDD.saveAsObjectFile(path)}.
-For transformer, model and other parameters, SystemX wraps each of them into an RDD then store them as object files.
+In the current implementation, SystemX uses Spark RDDs to store lineage information with HDFS as a backing store. 
+However, this lineage information could just as easily be stored virtually any conventional distributed storage system.
 
 
 \subsection{Geometry Mapping Index}
@@ -850,7 +848,7 @@ Table~\ref{tb:example} shows the mapping for each element and the 2D geometry ma
 \subsubsection{No Index}
 Using the example in Table~\ref{tb:example}, with {\bf NoIndex} strategy, a query for an element needs to traverse all circles (input geometries).
 If the element is in a circle, the query returns the all output elements expanded from the mapping rectangle.
-The time complexity of a query is $O(N)$, where N is the number of circles. 
+The time complexity of a query is $O(k)$, where $k$ is the number of circles. 
 
 \subsubsection{Direct Index}
 To build the {\bf Direct} index, SystemX uses each input element as key and the associated geometry as the value, as shown in Figure~\ref{fig:direct}.
@@ -976,7 +974,7 @@ CDH4 distribution of Hadoop.
 
 The two pipelines we are using are SIFTFisher and SourceExtractor. 
 The datasets VOC2007~\cite{pascal-voc-2007} and a subset of Sloan Digital Sky Survey~\cite{york00} (SDSS) Data Release 7, respectively.
-Table~\ref{tb:datasets} summarizes the size and number of files of the datasets. g
+Table~\ref{tb:datasets} summarizes the size and number of files of the datasets.
 
 \begin{table}[t]
 \begin{center}
@@ -1070,7 +1068,7 @@ With the first setting (meta-only), SystemX only captures the metadata mapping, 
 to preserve the pipeline lineage integrity.
 With the second setting (meta+data), SystemX captures both the metadata mapping and the output dataset of each transformer.
 With the lineage information captured in this way, queries on the output dataset does not require any rerunning of data transformations.
-And this is considered as the maximal lineage information of a pipeline. 
+This is considered as the maximal lineage information of a pipeline. 
 Table~\ref{tb:apps-stats} presents the the dataset size collected with both settings for both pipelines.
 
 \begin{table}[t]
@@ -1133,7 +1131,7 @@ While with the chained lineage (a sequence of transformers), an individual eleme
 on the chained lineage can return a large number of coordinates, e.g., 1~million, from
 the first transformer. 
 Then the subsequent query uses these 1~million coordinates as keys.
-And this large number of keys can impact the query performance substantially.  
+This large number of keys can impact the query performance substantially.  
 This performance measurement seeks to profile the boundary of query scalability of SystemX in terms of key number. 
 
 We run queries with a varying key numbers and present the performance in Figure~\ref{fig:typequery}. 
