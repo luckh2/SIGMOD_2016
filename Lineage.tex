@@ -1177,7 +1177,7 @@ Beyond that, a query with 10K keys takes $2.41\pm0.6$~seconds and a query with 1
 
 This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of a single transformer. 
 However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~seconds boundary. 
-This is a problem for end-to-end pipeline lineage investigation, e.g., verifying the self-contained property~\ref{sec:formal-skipping} of a sequence of data transformations.
+This is a problem for end-to-end pipeline lineage investigation with a sequence of data transformations.
 One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm 0.05$ for forward query.
 While in the case of SIFTFisher pipeline,  it can take an estimated $O(10^3)$~seconds to finish as the backward query on the SIFTExtractor
 transformer has a key size of 7.7M from a matrix with 128 rows and 60K columns to an image with 333 rows, 500 columns and 3 channels. 
