@@ -80,6 +80,7 @@
   \end{itemize}
         \vspace*{-0.5em}
 }
+\newcommand{\up}{\vspace*{-1em}}
 
 \begin{document}
 
@@ -104,7 +105,8 @@ SystemX efficiently enables data anomaly removal and computation replay, code de
 For a single transformation, SystemX's high-order function mapping strategy can reduce the storage consumption by up to 
 45x comparing to the element-wise mapping recording.
 The spatial index allows SystemX to speed up lineage query performance by a further 2x-31x. 
-The performance penalty introduced by SystemX's lineage capturing is 16\%-54\% depending on the pipeline and use case.
+SystemX can answer the real use case lineage queries within a few seconds, 
+which is low enough to keep the pace with users' diagnostic thought flow.
 \end{abstract}
 
 % A category with the (minimum) three required fields
@@ -247,7 +249,7 @@ In summary, we make the following contributions:
 \begin{shortlist}
 \item{} We design a concise and powerful lineage system interface by formulating the cell-wise mapping in ML pipelines as multi-dimensional space transformation.
 \item{} We introduce a high-order function to describe the geometry to reduce storage overhead.
-\item{} We present and evaluate a set of spatial indexing strategies to improve the query performance.
+\item{} We present the spatial index solution to speed up the geometry mapping query and evaluate a set of spatial indexing strategies.
 \item{} We present three real use cases of using fine-grained data lineage for code validation, results inspection, and data cleaning, respectively.
 \end{shortlist}
 
@@ -359,10 +361,9 @@ For simplicity, a string is viewed as a vector.
 An image is a three dimensional data structure that is defined by the height, the width and the number
 of channels. 
 
-An element $e \in I$ has two properties: value $e.value$ and coordinate $e.coor$ (referred as metadata or meta
-in the following discussion). 
+An element $e \in I$ has two properties: coordinate $e.Coor$ and $e.Value$. 
 Combining the additional dimension in the collection (RDD or sequence) with the data structure, 
-the metadata of an element is a pair of integers, a triple of integers, or a quadruple of integers
+the coordinate of an element is a pair , a triple, or a quadruple of integers
 for vector, matrix, and image, respectively.
 
 A pipeline $P$ is defined as a sequence of transformers $(T_1, T_2, ..., T_n)$. 
@@ -370,80 +371,80 @@ Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{i+1}
 $I_{i+1} = T_i(I_i)$. 
 Especially, the output of the whole pipeline is denoted as $O = I_{n+1}$
 
-To simplify the discussion, we use the vector data structure as example in the following discussion.
-Other data structures can be defined in a similar way. 
-For queries, we only present the definition of forward query given that backward query can be inducted by reversing
-the table order in the join operation.
+To simplify the discussion, we only present the definition of forward query given that 
+backward query can be inducted by reversing the table order in the join operation.
 
 \subsection{Dataset and Mapping}
 \label{sec:formal-ds-mapping}
 Conceptually, the input dataset and output dataset can be defined
-as tables with each element's position in the data structure as key.
-In reality, such tables is in the form of a distributed collection such as an RDD.
-\newline\newline
-\noindent\begin{minipage}{\textwidth}
-\noindent\begin{minipage}{.2\textwidth}
-\begin{verbatim}
-CREATE TABLE input
-(
-  Meta (INT, INT),
-  Value (DOUBLE)
-);
-\end{verbatim}
-\end{minipage} 
-\qquad{\color{black}\vrule}\qquad
-\begin{minipage}{.2\textwidth}
-\begin{verbatim}
-CREATE TABLE output
-(
-  Meta (INT, INT),
-  Value (DOUBLE)
-);
-\end{verbatim}
-\end{minipage}
-\end{minipage}
-\vspace{2ex}
+as tables with each element's coordinate in the data structure as key.
+\begin{lstlisting}
+input(Coor, Value)
+output(Coor, Value)
+\end{lstlisting}
+
+%\newline\newline
+%\noindent\begin{minipage}{\textwidth}
+%\noindent\begin{minipage}{.2\textwidth}
+%\begin{verbatim}
+%CREATE TABLE input
+%(
+%  Meta (INT, INT),
+%  Value (DOUBLE)
+%);
+%\end{verbatim}
+%\end{minipage} 
+%\qquad{\color{black}\vrule}\qquad
+%\begin{minipage}{.2\textwidth}
+%\begin{verbatim}
+%CREATE TABLE output
+%(
+%  Meta (INT, INT),
+%  Value (DOUBLE)
+%);
+%\end{verbatim}
+%\end{minipage}
+%\end{minipage}
+%\vspace{2ex}
 
 The mapping between the input and output dataset is a left outer join of the the two tables with a mapping function.
-The Fun function returns the corresponding output elements given an input element. 
+The Func() function returns the corresponding output elements given an input element. 
 It is a left outer join since an input element may not be corresponding to any output element.
 \begin{lstlisting}
-SELECT *
-From input
+SELECT * From input
 LEFT OUTER JOIN output 
-    ON Func(in.meta) $\ni$ out.meta;
+    ON Func(input.Coor) $\ni$ output.Coor;
 \end{lstlisting}
 
-In practice, SystemX separates the metadata from the actual element values and only record metadata mapping.
+In practice, SystemX separates the metadata from the actual element values and only record metadata mapping
+in a table.
 \begin{lstlisting}
-CREATE TABLE mapping
-(
-  In_meta (INT, INT),
-  Out_meta (INT, INT)
-);
-
-INSERT INTO mapping (In_meta, Out_meta)
-SELECT in.Meta, out.Meta
-From input
-LEFT OUTER JOIN output 
-    ON Fun(in.Meta) $\ni$ out.Meta;
+mapping(inCoor, outCoor)
 \end{lstlisting}
+
+\begin{lstlisting}
+INSERT INTO mapping
+SELECT input.Coor, output.Coor From input
+LEFT OUTER JOIN output 
+    ON Func(input.Coor) $\ni$ output.Coor;
+\end{lstlisting}
+
 The retrieval of actual element values can be obtained by joining the mapping table and the output dataset table.
 \begin{lstlisting}
-SELECT mapping.Meta, out.Value
+SELECT mapping.outCoor, output.Value
 From mapping
 LEFT OUTER JOIN output 
-    ON mapping.Out_meta = output.Meta;
+    ON mapping.outCoor = output.Coor;
 \end{lstlisting}
 
 The input and output mapping of a pipeline is in turn a sequence of mappings of individual transformer.
-Consider a pipeline $P=(T_1, T_2, ..., T_n)$, we denote $mapping_i$ as the mapping for transformer $T_i$.
-The mapping of the pipeline is a sequence of left outer join operations of $\{mapping_1, ..., mapping_n\}$ on 
-$mapping_i.out\_meta = mapping_{i+1}.in\_meta$.
+Consider a pipeline $P=(T_1, T_2, ..., T_n)$, we denote $mapping_i$ as the mapping table for transformer $T_i$.
+The mapping of the pipeline is a sequence of left outer join operations of $\{mapping_1, ..., mapping_n\}$ 
+\newline on $mapping_i.outCoor = mapping_{i+1}.inCoor$.
 
 \subsection{Mapping Function}
 \label{sec:Map-Func}
-The mapping function {\bf Func} contains the core information of the input and output element dependency.
+The mapping function {\bf Func()} contains the core information of the input and output element dependency.
 Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-dimensional vectors in the case
 of every output element depends on every input element. 
 To eliminate this polynomial explosion in space requirements, we identify seven primitive mapping functions.
@@ -463,10 +464,10 @@ Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with
 {\bf Collapse} mapping describes the mapping of a space collapsing into a one dimension lower space along one dimension which needs
 to be specified by the user. Examples include gray scaling a multiple channel image.
 {\bf Expansion} mapping is where a space expands to a one dimension lower space, e.g. expanding a matrix to a vector with column major.
-In {\bf Identity} mapping, each output element only depends on one element with the same coordinate in the input matrix.
-In {\bf All} mapping, each output element depends on all elements in the input matrix.
+In {\bf identity} mapping, each output element only depends on one element with the same coordinate in the input matrix.
+In {\bf all} mapping, each output element depends on all elements in the input matrix.
 {\bf Geometry} mapping describes the case where a group of output elements depend on a group of input elements.
-{\bf LinCom} mapping describes the data dependencies in a linear model.
+{\bf Lincom} mapping describes the data dependencies in a linear model.
 {\bf Join} mapping happens between equal dimension space transformation. The example in Figure~\ref{fig:narrowmapping} 
 is a transformation from a sequence of a vector collection (RDD) to a collection (RDD) of vector sequence by joining the vectors
 on the collection (RDD) position.
@@ -475,21 +476,19 @@ For the mappings that are not covered by the primitive functions, SystemX allows
 \subsection{Mapping Query}
 A forward query with a key  ({\it qForward(key)}) over the mapping of a transformer or a pipeline can be expressed as:
 \begin{lstlisting}
-SELECT out_meta
-FROM mapping
-WHERE key = in_meta;
+SELECT outCoor FROM mapping
+WHERE key = inCoor;
 \end{lstlisting}
 
-A forward query with a list of $keys={k_1, k_2, ..., k_n}$ ({\it qForward(keys)}) can be expressed as:
+A forward query with a list of $keys=\{k_1, k_2, ..., k_n\}$ ({\it qForward(keys)}) can be expressed as:
 \begin{lstlisting}
-SELECT out_meta
-FROM mapping
-WHERE $k_1$ = in_meta OR ... OR $k_n$=in_meta;
+SELECT outCoor FROM mapping
+WHERE $k_1$ = inCoor OR ... OR $k_n$ = inCoor;
 \end{lstlisting}
 
 \subsection{Data Preparation Skipping}
 \label{sec:formal-skipping}
-In use cases such as the data cleaning presented in \S\ref{sec:Back-Case-Cleaning}, users want
+In use cases such as data cleaning presented in \S\ref{sec:Back-Case-Cleaning}, users want
 to remove certain suspicious input data items that might relate to bad prediction results and retrain the model then
 test its performance. 
 Repeating the data preparation steps (e.g., from PixelScaler to RowNormalizer in SIFTFisher pipeline) incurs
@@ -498,7 +497,7 @@ One natural thought in such case is ``can we skip the computation applied on the
 the corresponding prepared data items directly?''
 
 Formally, given a data transformation {\it f()} applied on a set $C$ of vectors \{$v_1, v_2, ..., v_n$\}.
-we say it is safe to remove {\it f($v_i$)} when {\it $f(C \setminus {v_i})) = f(C) \setminus {f(v_i)}$}.
+we say it is safe to remove {\it f($v_i$)} if {\it $f(C \setminus {v_i})) = f(C) \setminus {f(v_i)}$}.
 In other words, function {\it f()} is distributive on vectors \{$v_1, v_2, ..., v_n$\}. 
 With single or few transformers, users are able to track the distributive property.
 However when the pipeline is deep, such a property is hard to track.
@@ -514,8 +513,8 @@ A data transformation f() is distributive if the mapping of f() is self-containe
 \end{theorem}
 
 \begin{proof}
-By contradiction, if f() is not distributive on collection $C$ of vectors  \{$v_1, v_2, ..., v_n$\}, then $\exists e \in v_j $ s.t. $f(v_i)$ takes as input.
-Then $e \in qBackward_f(qForward_f(v_i))$ and $e \in v_i$ which results in  $qBackward_f(qForward_f(v_i)) \nsubseteq v_i$, which violates condition.
+By contradiction, assume f() is not distributive on collection $C$ of vectors  \{$v_1, v_2, ..., v_n$\}, then $\exists e \in v_j $ s.t. $f(v_i)$ takes as input.
+Then $e \in qBackward_f(qForward_f(v_i))$ and $e \in v_i$ which results in  $qBackward_f(qForward_f(v_i)) \nsubseteq v_i$, which contradicts the assumption.
 \end{proof}
 
 \begin{corollary}
@@ -583,32 +582,31 @@ A sequence of data transformations ($s = {f_1, f_2, ..., f_n}$) is distributive 
 %\end{split}
 %\end{equation}
 
-\section{Design Goals}
-\label{sec:Req}
-In this section, we present the design goals of SystemX from the performance perspective.
-
-In general, as lineage capturing incurs additional computation and I/O for mapping materialization and storage, a non-trivial performance
-penalty based on the original workload is expected. 
-Table~\ref{tb:overhead} summarizes reported performance penalty introduced by lineage capturing in existing systems and SystemX. 
-
-
-This performance penalty problem is exacerbated for SystemX, since KeystoneML's distributed computing engine Apache Spark 
-optimizes for in-memory computing and does not write intermediate data to disks unless it is a shuffle operation. 
-Comparing to systems such as Hadoop, the same amount of I/O of SystemX will introduce a more significant penalty.
-By exploiting the advanced techniques for space reduction, we expect SystemX's performance penalty to be comparable to the existing systems.
-
-Lineage information can be massive depending on the pipeline, since the input or the intermediate dataset of a pipeline can be large.
-In some transformers, the mapping between the input elements and output elements does not conform a pattern, e.g., Geometry mapping.
-We need advanced techniques (e.g., a compact description of a set of elements) to reduce the storage explosion introduced by such mappings. 
-
-Using SystemX for ML pipeline diagnosing requires a low-latency interaction between users and the lineage serving unit.
-As documented in the report~\cite{nielsen2009} in human computer interaction, 1~second latency is the boundary to keep users' thought flow while 10~seconds
-is the boundary to loose users' attention.
-We expect SystemX's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
+%\section{Design Goals}
+%\label{sec:Req}
+%This performance penalty problem is exacerbated for SystemX, since KeystoneML's distributed computing engine Apache Spark 
+%optimizes for in-memory computing and does not write intermediate data to disks unless it is a shuffle operation. 
+%Comparing to systems such as Hadoop, the same amount of I/O of SystemX will introduce a more significant penalty.
+%By exploiting the advanced techniques for space reduction, we expect SystemX's performance penalty to be comparable to the existing systems.
+%
+%Lineage information can be massive depending on the pipeline, since the input or the intermediate dataset of a pipeline can be large.
+%In some transformers, the mapping between the input elements and output elements does not conform a pattern, e.g., Geometry mapping.
+%We need advanced techniques (e.g., a compact description of a set of elements) to reduce the storage explosion introduced by such mappings. 
+%
+%Using SystemX for ML pipeline diagnosing requires a low-latency interaction between users and the lineage serving unit.
+%As documented in the report~\cite{nielsen2009} in human computer interaction, 1~second latency is the boundary to keep users' thought flow while 10~seconds
+%is the boundary to loose users' attention.
+%We expect SystemX's query latency within the 10~seconds boundary to facilitate users diagnosis on ML pipelines.
 
 \section{Design}
 \label{sec:Design}
-In this section, we discuss SystemX's layered design of lineage capturing and instrumentation interface.
+SystemX is designed as an ML pipeline diagnostic tool. 
+It has two units: the capturing unit and the serving unit.
+The capturing unit requires a user-friendly, flexible, and powerful interface for lineage type declaration and instrumentation.
+Performance wise, the lineage capturing unit should minimize time consumption.
+The serving unit should be able to answer lineage queries with low latency to keep the pace with users' diagnostic thought flow.
+
+In this section and next, we present the design and implementation to address the above goals.
 
 \subsection{Overview}
 Figure~\ref{fig:architecture} shows the overview of SystemX and its interactions with other components. 
@@ -617,9 +615,9 @@ The two-sided arrows indicate interactions between components.
 Users compose machine learning pipelines with KeystoneML and submit the compiled DAG to Spark.
 All computation and I/O are done through the Spark Resilient Distributed Dataset (RDD) abstraction.
 With SystemX, users can declare and instrument lineage at the transformer level, 
-so that the compiled DAG also contains lineage recording and other operations, e.g., save to disk.
+so that the compiled DAG also contains lineage capturing and storing operations.
 Lineage in SystemX is stored to HDFS~\cite{shvachko10} via Spark's RDD abstraction.
-Users can load the stored lineage in HDFS to Spark interactive command line interface.
+SystemX can load the stored lineage in HDFS to Spark interactive command line interface.
 By interacting using the query interface, users can query elements of interest, replay transformation, or analyze
 the lineage for other purposes.
 
@@ -637,8 +635,8 @@ the lineage for other purposes.
 SystemX exposes the lineage capturing interface by naming the lineage type specific class with its mapping types between input and output datasets.
 All the type specific class inherits an abstract class of Lineage, which define common methods shared among the type specific classes:
 \begin{shortlist}
-\item{} qForward(keys: List[Coor]): List[Coor], given a list of element metadata (coordinates) returns the forward query results on the metadata mapping of the lineage
-\item{} qBackward(keys: List[Coor]): List[Coor], given a list of element metadata (coordinates) returns the backward query results on the metadata mapping of the lineage
+\item{} qForward(keys: List[Coor]): List[Coor], given a list of element coordinates returns the forward query results on the metadata mapping of the lineage
+\item{} qBackward(keys: List[Coor]): List[Coor], given a list of element coordinates returns the backward query results on the metadata mapping of the lineage
 \item{} saveMapping(): saves the collection of metadata mappings of a lineage to disks
 \item{} saveInput(): saves the input dataset to disks
 \item{} saveOutput(): saves the output dataset to disks.
@@ -671,39 +669,58 @@ the input dataset (in), the output dataset (out), the transformer (transformer),
 the collection of mappings (mappingCollection), the model (model), and the random 
 parameter (rand).
 
-By checking the input and output dataset, SystemX is able to figure out the metadata of each data structure then use
-it to declare the mapping objects.
+By checking the input and output dataset, SystemX is able to figure out the metadata of each data structure 
+(e.g., the number of dimensions of the space and the size of each dimension) then use it to specify the mapping types.
 
 \subsection{Mapping}
 \label{sec:Design-Mapping}
 Mapping on the abstract level provides two interfaces: qForward() and qBackward(). Both interfaces
-take a list of element metadata (coordinates) and return the query results accordingly.
+take a list of element coordinates and return the query results accordingly.
+A complete mapping types are presented in Table~\ref{tb:mapping-interface}
 
-For all mapping types presented in ~\S\ref{sec:Map-Func} except Geometry mapping, 
+For every mapping type presented in ~\S\ref{sec:Map-Func} except the {\bf geometry} mapping, 
 SystemX infers metadata of data structures automatically. 
-For example in an All mapping between two matrices of 5 rows and 5 columns,
-the mapping is recorded as AllMapping(twoDMeta(5, 5), twoDMeta(5,5)). 
-So upon forward query, AllMapping returns the coordinates of all 25 elements in the output matrix by only looking into the matrix metadata.
-
-SystemX defines three types of metadata to simplify the interface:
-\begin{shortlist}
-\item{} oneDMeta: Int
-\item{} twoDMeta: (Int, Int)
-\item{} threeDMeta: (Int, Int, Int)
-\end{shortlist}  
-While users still have the flexibility to declare metadata that has higher dimensions.
+The metadata  of a data structure can be one dimensional (with type of Int), two dimensional (with type of (Int, Int)), and etc.
+For example in an all mapping between two matrices of 5 rows and 5 columns,
+the mapping is recorded as AllMapping(Meta(5, 5), Meta(5,5)). 
+So upon forward query, the all mapping returns the coordinates of all 25 elements in the output matrix by only looking into the matrix metadata.
 SystemX also uses this data structure metadata to check out-of-bound errors if the given key is outside the space of the data structure.
 
 For geometry mapping, the mapping is arbitrary and cannot benefit from data structure metadata, 
-Intuitively, users to pass the exact mapping in the form of a collection, inside which is a list of tuples, where each tuple 
+Intuitively, users have to pass the exact mapping in the form of a collection, inside which is a list of tuples, where each tuple 
 contains one set of input element coordinates and one set of output geometry element coordinates. 
-This simple solution takes a tremendous amount of space to materialize the mapping in memory and store on disks.
+This intuitive solution takes a tremendous amount of space to materialize the mapping in memory and store on disks.
+
+
+\begin{table}[t]
+\begin{center}
+    \caption{Primitive Mapping Types}
+    \begin{scriptsize}
+    \begin{tabular}{ | p{8cm}|}
+    \hline
+    CollapseMapping(inMeta, outMeta, dimension) \\ \hline 
+    ExpansionMapping(inMeta, outMeta, dimension) \\ \hline
+    IdentityMapping(inMeta, outMeta) \\ \hline
+    AllMapping(inMeta, outMeta) \\ \hline
+    GeometryMapping(inMeta, outMeta, mappingCollection) \\ \hline
+    LinComMapping(inMeta, outMeta, model) \\ \hline
+    JoinMapping(inMeta, outMeta, dimension) \\ \hline
+    CustomMapping(inMeta, outMeta, fFunc, bFunc, model, rand) \\ \hline
+    \end{tabular}
+    \end{scriptsize}
+    \label{tb:mapping-interface}
+\end{center}   
+\end{table}
 
 \subsection{Geometry Mapping}
 \label{sec:Design-GeometryMapping}
 To reduce the size of geometry mapping, SystemX uses a high-order function approach to describe the geometries.
-As can be seen in the geometry mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an output element should return all the input elements in the corresponding geometry. If the output geometry has $N$ elements and the input geometry has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
-Inspired by the Scale-invariant feature transform (SIFT) and the SourceExtractor implementation, each of them processes an input matrix and produces thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements form a two dimensional shape. 
+As can be seen in the geometry mapping example in Figure~\ref{fig:narrowmapping}, the backward query of an 
+output element should return all the input elements in the corresponding geometry. If the output geometry has 
+$N$ elements and the input geometry has $N$ elements, the space complexity of storing such a mapping is $O(N^2)$. 
+Inspired by the SIFT and the SourceExtractor implementation, each of them processes an input matrix and produces 
+thousands of vectors as outputs. An output vector depends on a group of elements in the matrix, and these elements 
+form a two dimensional shape. 
 For SIFT, the input elements form a circle with a geographical center and the scale as its radius.
 Similarly, the SourceExtractor's input elements form an ellipse. 
 SystemX uses a high-order function to describe the geometry such as circle and ellipse. 
@@ -717,62 +734,64 @@ Users can pass in the geographical information directly to declare rectangle, ci
 Using the high-order function involves an issue for query. 
 As both the input elements and output elements are encoded with a high-order function. 
 And the mapping between input function and output function is stored in a list. 
-A query that takes an output element as key thus needs to iterate over all input functions and test if the key is in the function or not.
-If the key is in an input function, it then returns the mapping output function, and expands the function to a group of coordinates.
+A forward query that takes an input element as key thus needs to iterate over all input functions and test if the key is in the function or not.
+If the key is in an input function, it then returns the mapping output function, and expands the function to a set of coordinates.
 The time complexity of query over geometry mapping is then $O(N^2)$, assuming there are $N$ tuples in the list and each input function expands to $N$ elements.
 To speedup the query performance, we implement and compare several indexing strategies, and a detailed discussion is in \S\ref{sec:GeometryIndex}.
 
 
 \section{Implementation}
 \label{sec:Impl}
+This section discusses the implementation details for lineage space reduction, mapping function inversions, 
+generalization of the primitive mapping types, lineage storage, and the geometry mapping indexing strategies.
 
-This section discusses implementation details for lineage collection, I/O, and geometry mapping index.
 
 \subsection{Metadata Separation}
-Capturing lineage and storing it introduces performance penalty compared to the lineage-free case. 
-One way to minimize this penalty is to store less data without sacrificing the integrity of the lineage information.
-As discussed in \S\ref{sec:formal-ds-mapping}, SystemX separates the metadata of a data structure from the 
-actual data (e.g., the coordinates of elements in a matrix), and mandates metadata mapping while leaves
-the actual dataset storage an option for users.
+Capturing lineage and storing it results in longer wall clock time compared to the lineage-free case. 
+One way to minimize this capturing time is to store less data.
+As discussed in \S\ref{sec:formal-ds-mapping}, SystemX separates the metadata of a data structure 
+(e.g., the coordinates of elements in a matrix) from the actual data  and leave the options for users to 
+instrument what dataset to collect.
 
-Storing only the metadata mapping can still preserve the lineage information integrity given that the intermediate and result 
+However, under the constraint of complete pipeline lineage integrity, a minimal dataset to be captured
+is all the metadata mapping of the transformers given that the intermediate and result 
 dataset can always be reproduced with the KeystoneML transformer given the its determinism property. 
-A profile study on the SIFTFisher, SourceExtractor and MNIST pipelines shows a space reduction by 
-13.7x (from 725.6~GB to 109.9~GB), 2480.9x (from 507.1G to 204.4M), and 150.8x (from 11.9~GB to 78.9~MB)
+A profile on the SIFTFisher and SourceExtractor pipeline shows a space reduction by 
+13.7x (from 725.6~GB to 109.9~GB) and 2480.9x (from 507.1G to 204.4M), respectively.
 
 \subsection{Mapping Inversion}
 When formulating the cell level mapping of a transformer as a multi-dimensional space transformation, SystemX defines
 the mapping in the direction from input to output and name the according lineage type with its mapping type.
-In this paragraph, we explain how to infer backward query (the mapping reverse) of the transformer.
-{\bf All mapping}, {\bf identity mapping}, {\bf lincom mapping}, and {join mapping} are symmetric, 
-meaning the reverse of these two mappings are also {\bf all mapping}, {\bf identity mapping}, 
-{\bf lincom mapping}, and {\bf join mapping} respectively.
+In this paragraph, we explain how to infer backward query (the mapping inverse) of the transformer.
+All mapping, identity mapping, lincom mapping, and join mapping are symmetric, 
+meaning the inverse of these two mappings are also all mapping, identity mapping, 
+lincom mapping and join mapping respectively.
 
 {\bf Collapse mapping} and {\bf expansion mapping} are not symmetric, but the mapping inversion can be inferred
 given the data structure metadata (the number and size of dimensions of a n-dimensional space). For example, 
 in the collapse case shown early in Figure~\ref{fig:narrowmapping}, a matrix with three rows and three columns
-collapses into a vector of three along column dimension. Thus a mapping inversion of an element of of the vector
+collapses into a vector along the row dimension. Thus a mapping inversion of an element of of the vector
 is all elements in the corresponding row in the matrix. 
-The inversion of {\bf expansion mapping} can also be inferred with simple calculation.
-The inversion of {\bf geometry mapping} is enabled by switch the order of the geometry order of each tuple.
+The inversion of expansion mapping can also be inferred with simple calculation.
+The inversion of geometry mapping is enabled by switch the order of the order of each geometry pairs.
 
-For mappings that are not covered by the seven primitive types, SystemX allows users to define {\bf CustomLineage}
+For mappings that are not covered by the seven primitive types, SystemX allows users to define {\bf custom} mapping
 which requires two functions, one for forward mapping and the other for backward mapping.
 
 \subsection{Other Mapping Cases}
-Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the {\bf collapse mapping} and {\bf expansion mapping}
-map spaces that have different dimensions. By definition, they only maps from higher-dimensional space to lower-dimensional space.
-A transformer that reduces lower-dimensional space to higher-dimensional space, e.g., transforming a vector into a matrix, can use
-the same {\bf ExpansionLineage} type for declaration based on the fact that the reverse mapping of this transformation is a
-{\bf expansion mapping}. SystemX can infer the mapping direction based on the metadata of data structures 
+Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the collapse mapping and expansion mapping
+map spaces that have different dimensions. By definition, they only maps from a higher-dimensional space to a lower-dimensional space.
+A transformer that reduces a lower-dimensional space to a higher-dimensional space, e.g., transforming a vector into a matrix, can use
+the same ExpansionLineage type for declaration based on the fact that the reverse mapping of this transformation is a
+expansion mapping. SystemX can infer the mapping direction based on the metadata of data structures 
 (the number and size of dimensions of a n-dimensional space). 
-A similar solution is used for the reverse of {\bf collapse mapping}.
+A similar solution is used for the reverse of collapse mapping.
 
-For sampling transformers, e.g., selecting a subset of a vector collection, SystemX implements it as a {\bf geometry mapping}.
+For sampling transformers, e.g., selecting a subset of a vector collection, SystemX implements it as a geometry mapping.
 From the input side, there are a list of geometries (rectangles for vectors) with each pointing to an output geometry (a rectangle for a vector).
 
 In practice, it is recommended that users define a transformer with one primitive mapping type to use SystemX and it is often the case since
-39 out of 45 transformers in the current KeystoneML code base are coded this way. 
+39 out of 45 transformers in the current KeystoneML code base are coded in this way. 
 Meanwhile, we are also looking into ways to declare complex data transformations by composing the primitive mapping types.
 
 
@@ -780,7 +799,7 @@ Meanwhile, we are also looking into ways to declare complex data transformations
 SystemX uses the RDD abstraction of Apache Spark for lineage information storage. 
 At a high level, SystemX creates a unique directory on the underlying file system with a naming pattern of 
 concatenating the transformer name and the initial input dataset identifier of the pipeline.
-In this way, SystemX can tell between the training pipeline and test pipeline based on the directory name
+In this way, SystemX can tell between the training pipeline and test pipeline based on the input dataset identifier,
 if the training and testing are run in a single program given that the training and test datasets are distinct.
 
 For the datasets and mappings, SystemX write them to file system by calling {\it RDD.saveAsObjectFile(path)}.
@@ -800,7 +819,8 @@ The backward query works in a similar way by reverting the the geometry tuple.
 
 
 Figure~\ref{fig:example} shows the example that is used in the following discussion.
-\begin{figure}[t]
+Table~\ref{tb:example} shows the mapping for each element and the 2D geometry mapping.
+\begin{figure}[h]
 \begin{center}
     \includegraphics[width=85mm]{pictures/example}
 \caption {A geometry mapping example, the left matrix is input and the right matrix is output. The mapping between the geometries are shown using gray shades.
@@ -809,8 +829,8 @@ Figure~\ref{fig:example} shows the example that is used in the following discuss
 \end{center}
 \end{figure}
 
-Table~\ref{tb:example} shows the mapping for each element and the regressed 2D geometry mapping.
-\begin{table}[t]
+
+\begin{table}[h]
 \begin{center}
     \caption{Element-wise mapping and regressed geometry mapping of the example in Figure~\ref{fig:example}}
     \begin{scriptsize}
@@ -871,8 +891,8 @@ R-tree is sufficient to validate the idea of using spatial indexing for geometry
 
 SystemX uses an open source R-tree implementation, Archery~\cite{osheim13} to build the {\bf RTree} index.
 In the Archery implementation, both the leaf nodes and the non-leaf nodes are abstracted as rectangles.
-To differentiate from the rectangle geometries, the non-leaf rectangle is referred as box.
-To adapt the geometry to Archery, SystemX firstly computes the bounding box of each circle, then SystemX uses
+To differentiate from the rectangle geometries, an Archery rectangle is referred as a box.
+To adapt the geometry to Archery, SystemX firstly computes the bounding box of each circle, then uses
 a tuple of the bounding box and the circle as leaf node of the R-tree. 
 The index is built upon the bounding boxes. 
 The query of an input element (0,0) in the R-tree returns a tuple of the bounding box (center: (0.5,0.5), height:1, width:1) and circle\_0.
@@ -946,17 +966,17 @@ The space complexity of {\bf KMeans} is $O(\sqrt{N})$.
 In this section, we evaluate a number of aspects of SystemX's performance.
 We demonstrate a set of built-in indexing strategy for geometry mapping, and profile the tradeoff
 between index building time, query performance, memory usage and storage consumption.
-Then we present the scalability of SystemX's lineage capturing with two real ML pipelines on varying cluster sizes.
+Then we present the scalability of SystemX's lineage capturing performance with two real ML pipelines on varying cluster sizes.
 We also measure the performance of the three use cases presented in \S\ref{sec:Back-cases}.
 
-Unless otherwise specified, all experiments are run on Amazon EC2 using r3.8xlarge instances.
+All experiments are run on Amazon EC2 using r3.8xlarge instances.
 Each machine has 16 physical cores, 244 GB memory, and two 320GB SSD. 
 SystemX is integrated with KeystoneML 0.3 which in turn runs over Spark 1.3.1, HDFS from the
 CDH4 distribution of Hadoop. 
 
 The two pipelines we are using are SIFTFisher and SourceExtractor. 
 The datasets VOC2007~\cite{pascal-voc-2007} and a subset of Sloan Digital Sky Survey~\cite{york00} (SDSS) Data Release 7, respectively.
-Table~\ref{tb:datasets} summarizes the size and number of files of the datasets.
+Table~\ref{tb:datasets} summarizes the size and number of files of the datasets. g
 
 \begin{table}[t]
 \begin{center}
@@ -975,17 +995,22 @@ Table~\ref{tb:datasets} summarizes the size and number of files of the datasets.
 
 \subsection{Geometry Mapping Index}
 \label{sec:Perf-Index}
-With this experiment we seek to profile the characteristics of the indexing strategies for geometry lineage discussed in \S\ref{sec:GeometryIndex}.
-We use a workload with 5,000 pairs of input and output matrix, with each pair producing 60,000 geometry mappings that are uniformly distributed
-in 2D space. The total number of mappings has 300 million geometries. 
-This test workload is derived from the SIFTExtractor transformer in the SIFTFisher pipeline.
-The experiment was executed on a 16 machine cluster.
+With this experiment we seek to profile the query latency, lineage capturing time, memory usage and storage space 
+of the indexing strategies for geometry mapping discussed in \S\ref{sec:GeometryIndex}.
+In particular, KMeans-1 builds the index with one iteration while KMeans-5 builds the index with five iterations.
+We use a workload derived from the SIFTExtractor transformer in the SIFTFisher pipeline. 
+The mapping has 5,000 pairs of input and output matrix, with each pair producing 60,000 geometry pairs (300 million in total) that are uniformly distributed
+in a 2D space. 
+The experiment is executed on a 16 machine cluster.
 
 Figure~\ref{fig:sift-query} presents the query performance with these indexing strategies.
-For each strategy, we run queries with {1, 100, 1000, 10000} batch size.
-NoIndex strategy perform worst among the four strategies, the query latency quickly grow over 10,000~ms with batch size of 100.
-The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with batch size of 1000 and 10000, respectively.
-KMeans-5 runs  31.1\% and 35.2\% faster with batch size of 1000 and 10000, respectively.
+For each strategy, we run queries with \{1, 100, 1K, 10K\} keys.
+The Direct strategy crashes due to insufficient memory.
+NoIndex strategy shows a high query latency which quickly grows over 10,000~ms with 100 keys.
+The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with 1K and 10K keys, respectively.
+KMeans-5 runs  31.1\% and 35.2\% faster with 1K and 1K keys, respectively.
+This result is as expected as the Archery implementation hard codes the number of objects as 50 for each leaf node, which results in a deep tree.
+While the KMeans strategies are building two-level trees.
 
 \begin{figure}[t]
 \begin{center}
@@ -996,24 +1021,21 @@ KMeans-5 runs  31.1\% and 35.2\% faster with batch size of 1000 and 10000, respe
 \end{center}
 \end{figure}
 
-Figure~\ref{fig:sift-time} presents the end-to-end performance of this workload with a detailed runtime decomposition. For each data point, 
-we run it three times and present the average. 
+Figure~\ref{fig:sift-time} presents the wall clock time of this workload with a detailed runtime decomposition. 
+Capturing 300 million geometry pairs takes 89.8~seconds overhead in average. 
+Building the index for these mappings takes 33.9, 69.9, and 349.0~seconds for RTree, KMeans-1, and KMeans-5, respectively.
+Table~\ref{tb:sift-index-resource} presents the additional memory usage, storage space for mappings and
+index separately.
 
 \begin{figure}[t]
 \begin{center}
     \includegraphics[width=85mm]{pictures/SIFTIndex-Time}
-\caption {Runtime profile of the indexing strategies for geometry mapping over 300 million geometry mappings.
+\caption {Runtime profile of the indexing strategies for geometry mapping with over 300 million pairs.
     \label{fig:sift-time}
 }
 \end{center}
 \end{figure}
 
-Capturing 300 million geometry mappings takes 89.8~seconds overhead in average. 
-Building the index for these mappings takes 33.9, 69.9, and 349.0~seconds for RTree, KMeans-1, and KMeans-5.
-The Direct strategy crashes due to insufficient memory.
-
-Table~\ref{tb:sift-index-resource} presents the additional memory usage, storage space for mappings and
-index separately.
 
 \begin{table}[t]
 \begin{center}
@@ -1032,22 +1054,16 @@ index separately.
 \end{center}   
 \end{table}
 
-The storage consumption of the four indexing strategies is 30.8GB, 55.4GB, 34.3GB, and 34.3GB 
-for NoIndex, RTree, KMeans-1, KMeans-5, respectively. 
-For RTree strategy, the index takes as much as 83\% of the mapping size. 
-While for RTree, it is 11.4\%.
-These four indexing strategies use 71.4\%, 85.7\%, 85.7\%, and 114.3\% more memory comparing to the
-baseline case that does not track lineage.
 
-To summarize, NoIndex has the lowest query performance and it is not practical for real use.
-KMeans-5 has the best query performance the longest index building time.
+To summarize, NoIndex has the highest query latency and it is not practical for real use.
+KMeans-5 has the best query performance and the longest index building time.
 RTree has a balanced query performance and building time with the highest storage consumption.
 Since storage is not the major bottleneck given the machine capability, SystemX uses the RTree strategy
-as default, leaving the RTree strategies as users' options.
+as default, leaving the other strategies as users' options.
 
 
 \subsection{Lineage Capturing Scalability}
-We evaluate lineage capturing performance with the SIFTFisher and SourceExtractor pipelines. 
+We evaluate lineage capturing wall clock time with the SIFTFisher and SourceExtractor pipelines. 
 The goal is to evaluate if lineage capturing is scalable with larger cluster size in a strong scaling manner.
 For each pipeline, we measure the wall clock time of lineage capturing with two settings.
 With the first setting (meta-only), SystemX only captures the metadata mapping, since this is the minimal lineage information 
@@ -1072,7 +1088,7 @@ Table~\ref{tb:apps-stats} presents the the dataset size collected with both sett
 \end{center}   
 \end{table}
 
-Figure~\ref{fig:VOC-overhead} shows the isolated wall clock time of lineage capturing performance for the meta-only and meta+data
+Figure~\ref{fig:VOC-overhead} shows the isolated wall clock time of lineage capturing for the meta-only and meta+data
 settings. From small scale to large scale, the meta-only setting scales up to 16 machines then flattens. 
 On the other hand, the meta+data setting shows a better scalability since this is a relatively more
 data-intensive procedure compared to the meta-only setting. 
@@ -1092,7 +1108,7 @@ and using 8 machines removes this bottleneck.
 
 Figure~\ref{fig:SE-overhead} shows the isolated wall clock time lineage capturing for the meta-only and meta+data settings.
 By profiling the SourceExtractor performance, we observe that this pipeline's runtime only improves by 5.5\% from 8 machines
-to 16 machines. Then the performance starts to slow down with more machines due to the small input file size and short task runtime.
+to 16 machines. Then the performance starts to slow down with more machines.
 Given the poor scalability of the SourceExtractor pipeline, the meta-only setting performance is bounded by the pipeline performance.
 While the Meta+Data setting scales better due to its nature of data intensiveness.
 \begin{figure}[t]
@@ -1104,22 +1120,23 @@ While the Meta+Data setting scales better due to its nature of data intensivenes
 \end{center}
 \end{figure}
 
-One pattern we can conclude from the scalability measurements is that SystemX's lineage capturing performance scales no worse than the ML pipelines.
-This is due to the fact that SystemX captures and stores the lineage in a distributed manner with the RDD data structure. 
+One pattern we can conclude from the scalability measurements is that SystemX's lineage capturing wall clock time scales no worse than the ML pipelines.
+This is due to the fact that SystemX captures and stores the lineage in a distributed manner with the RDD abstraction. 
 The metadata mapping capturing is more likely to be impacted by the ML pipeline comparing to the case where both metadata
 mapping and datasets are captured, since it is a relatively less data-intensive operations.
 
 
-\subsection{Query Performance}
+\subsection{Query Latency and Scalability}
 In some cases, a user is only interested in one element of a single transformer.
 The query is then in the form of random query with a single key.
 While with the chained lineage (a sequence of transformers), an individual element query 
-on a transformer can return a large number of coordinates, e.g., on the order of 1M. 
-The subsequent query then uses these 1M coordinates as keys.
-And this large number of key size can impact the query performance substantially.  
-This performance measurement seeks to profile the boundary of query scalability in SystemX. 
+on the chained lineage can return a large number of coordinates, e.g., 1~million, from
+the first transformer. 
+Then the subsequent query uses these 1~million coordinates as keys.
+And this large number of keys can impact the query performance substantially.  
+This performance measurement seeks to profile the boundary of query scalability of SystemX in terms of key number. 
 
-We run queries with a varying size of keys and present the performance in Figure~\ref{fig:typequery}. 
+We run queries with a varying key numbers and present the performance in Figure~\ref{fig:typequery}. 
 For each lineage type, we use a distributed collection (RDD) of 5,000 pairs of 
 input and output data structures (vector, matrix, image) and distribute them into 200 partitions over 16 machines.
 Table~\ref{tb:typequery-stats} shows the metadata settings of the input and output data structure in each query
@@ -1153,62 +1170,60 @@ Table~\ref{tb:typequery-stats} shows the metadata settings of the input and outp
 \end{center}   
 \end{table}
 
-Given the {\bf All Mapping}, {\bf Identity Mapping}, {\bf LinCom Mapping}, {\bf Expansion Mapping}, {\bf Collapse Mapping}, {\bf Join Mapping}
-only involves trivial computation, queries with key size from 1 to 10K show latency under 200~ms which is generally the Spark operating latency. 
+Given the fact that all mapping, identity mapping, lincom mapping, expansion mapping, collapse mapping, and join mapping
+only involves trivial computation, queries with 1 to 10K keys show latency under 200~ms which is generally the Spark operating latency. 
 These queries show performance degradation with 100K keys (generally around 1~second). 
-From 100K key size, the query turnaround time increases proportionally with the key size as shown with the 1M key performance.
-{\bf Geometry Mapping} shows a consistent turnaround time under 200~ms from 1 to 1K key size. 
-Beyond that, query with 10K keys takes $2.41\pm0.6$~seconds and query with 1M keys take $132.9\pm0.4$~seconds
+From 100K keys, the query latency increases proportionally with the key number as shown with the 1M key performance.
+Geometry Mapping shows a consistent latency under 200~ms from 1 to 1K keys. 
+Beyond that, a query with 10K keys takes $2.41\pm0.6$~seconds and a query with 1M keys take $132.9\pm0.4$~seconds
 
 This query scalability profile shows low latency ($\sim$200~ms) for an individual element investigation of a single transformer. 
-However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~seconds boundary mentioned in ~\S\ref{sec:Req}. 
-This is a problem for end-to-end pipeline lineage investigation, e.g., verifying intermediate data removal safety property~\ref{sec:formal-skipping}.
+However the quickly increasing key size results in long overall turnaround time, which can exceed the 10~seconds boundary. 
+This is a problem for end-to-end pipeline lineage investigation, e.g., verifying the self-contained property~\ref{sec:formal-skipping} of a sequence of data transformations.
 One such case on the MNIST pipeline with 16 chained transformers takes $1\pm0.1$~seconds for backward query and $1.0\pm 0.05$ for forward query.
 While in the case of SIFTFisher pipeline,  it can take an estimated $O(10^3)$~seconds to finish as the backward query on the SIFTExtractor
 transformer has a key size of 7.7M from a matrix with 128 rows and 60K columns to an image with 333 rows, 500 columns and 3 channels. 
 For the moment, we put this large scale query optimization as future work.
 
 \subsection{Use Case}
-In the {\bf code validation} case, users instrument the SIFTFisher pipeline by only recording the metadata mapping of the SIFTExtractor transformer.
+In the {\bf code validation} case, users instrument the SIFTFisher pipeline by only capturing the metadata mapping of the SIFTExtractor transformer.
 Upon validation, users can query extracted feature, and locate the positions of the feature in the input image. With some external visualization tool,
-users can visualize corresponding pixels in the original image. Such an instrumentation introduces a performance penalty of 15.8\% on a 16 machine 
+users can visualize corresponding pixels in the original image. Such an instrumentation introduces a wall clock time overhead of 15.8\% on a 16 machine 
 cluster.
 Query a single feature takes $0.14\pm0.0062$~seconds while a batch query of 1,000 features takes $0.33\pm0.001$~seconds.
 
-In the {\bf results inspection} use case, users of the SourceExtractor pipeline collects the metadata mapping in all transformers along with the output 
+In the {\bf results inspection} use case, users of the SourceExtractor pipeline captures the metadata mapping in all transformers along with the output 
 datasets of the last step. By joining the metadata mapping with output datasets, which contains the luminosity information, users can first filter out the
-objects with a threshold brightness. Then query the metadata mapping to find the positions of corresponding pixels in the input images.
-This instrumentation introduces a performance penalty of 40.8\% on a 8 machine cluster. 
-Filtering luminous flux $>300,000$~lumen over 1 million objects returns 10,283 objects
+objects with a threshold brightness. Then the user queries the metadata mapping to find the positions of corresponding pixels in the input images.
+This instrumentation introduces a wall clock time overhead of 40.8\% on a 8 machine cluster. 
+Filtering {\it luminous flux >300,000~lumen} over 1 million objects returns 10,283 objects
 with its corresponding pixel positions in $1.84\pm0.14$~seconds. 
 A forward query that traces the error propagation given a bad pixel takes $3.3\pm0.03$~seconds to return.
 
-In the {\bf data cleaning} use case, the user of the SIFTFisher pipeline want to remove the training images that has both the human and table as
-he sees such a combination results in lower detection accuracy for the human category .
-So he instruments pipeline collecting all metadata mappings and the output datasets for NormalizeRows transformer. 
-Upon removal, he first joins the output dataset of NormalizeRows (a RDD of vectors) transformer with the labels.
+In the {\bf data cleaning} use case, the user of the SIFTFisher pipeline wants to remove the training images that have both the dogs and cats.
+So he instruments the pipeline to capture all metadata mappings and the output datasets for NormalizeRows transformer. 
+Upon removal, he first joins the output dataset of NormalizeRows (a RDD of vectors) with the labels.
 Then he filters out the corresponding vectors with both cats and dogs in it ( eight vectors corresponding to eight images in this case). 
 From here, he can try retrain the model with the cleaned dataset. 
-This particular instrumentation introduces a performance penalty of 46.8\%, and the removal takes $25.7\pm0.27$ seconds.
+This particular instrumentation introduces a wall clock time overhead of 46.8\%, and the removal takes $25.7\pm0.27$ seconds.
 Comparing to the case of rerunning the data preparation phase of the pipeline, using lineage information speeds up the turnaround
 time by 16.4x (from $421.3\pm3.8$~seconds to $25.7\pm0.3$~seconds). 
-Further, to confirm the safety of the removal, the users can query the lineage backward to find corresponding 
-images and conduct a verification.
+
 
 \section{Related Work}
 \label{sec:Related}
 {\bf Coarse-grained Lineage:} Researchers have extensively studied data lineage (in some cases referred as data provenance) in different contexts.
-For scientific workflow systems such as  Chimera~\cite{foster02}, Taverna~\cite{oinn02}, and ESSW~\cite{frew01}, 
-collects coarse-grained lineage of file metadata and according computation. 
-Similar work has been well summarized by survey~\cite{simmhan05, freire08, bose05}
+Scientific workflow systems such as  Chimera~\cite{foster02}, Taverna~\cite{oinn02}, and ESSW~\cite{frew01}, 
+collect coarse-grained lineage of file metadata and computation. 
+Similar work has been well summarized by survey~\cite{simmhan05, freire08, bose05}.
 Recent work~\cite{altintas10} investigates how to integrate the lineage of workflow executions
 in a collaborative environment. Coarse-grained lineage is useful in these systems to trace the data and code dependencies.
-Since the lineage collected is coarse-grained, it is not sufficient for cell level diagnosis of ML pipelines.
+However, the coarse-grained lineage lacks the details for cell level diagnosis of ML pipelines.
 
 {\bf Fine-grained Lineage:} Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
 data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
-Recent works of RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} collects fine-grained lineage for the MapReduce
-systems. SubZero~\cite{wu13} proposes a prototype lineage system for array-based database system SciDB~\cite{brown10}.
+Recent works of RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} capture fine-grained lineage for the MapReduce
+systems. SubZero~\cite{wu13} proposes a prototype lineage system for array-based database SciDB~\cite{brown10}.
 All these systems design lineage capturing interface on the well-regulated low level operators.
 For example, the data warehouse has the aggregate, select, project, join operators. 
 RDMBS has its SQL operators. MapReduce systems formulates the computation as mappers and reducers.
@@ -1232,9 +1247,10 @@ The Arnold system~\cite{devecsery14} captures fine-grained lineage at operating 
 all non-deterministic data such as the order, return values, modified memory addresses, and many others. 
 This approach can collect fine-grain lineage for any process running on top of the operating system, however
 it looses track of the upper level data structures (e.g., vector, matrix, images), which are fundamental to ML pipelines.
-One step beyond fine-grained lineage, researches~\cite{meliou10, meliou11} explores the causality and responsibility
-of inputs to the results. Though the causality and responsibility is relatively easier for data transformations in ML pipelines.
-It can be applied in the training process analysis to infer the contribution of individual training sample to the model and predictions.
+One step beyond fine-grained lineage, researches~\cite{meliou10, meliou11} explore the causality and responsibility
+of inputs to the results. Though the causality and responsibility is relatively easier for data transformations in ML pipelines,
+such techniques can be applied in the training process analysis to infer the contribution of individual training sample to the 
+model and predictions.
 
 
 \section{Conclusion and Future Work}
