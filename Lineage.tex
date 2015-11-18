@@ -121,7 +121,7 @@ Among these systems, Scikit-learn~\cite{pedregosa2011scikit}
 is a single-computer-based framework while TensorFlow~\cite{tensorflow15}, Apache Mahout~\cite{owen2011mahout}, MLlib~\cite{meng2015mllib}, 
 SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a distributed environment.
 
-In practice, to obtain a working model, users often need to try a number of options (e.g. featurization, training parameters, and datasets). 
+In practice, to obtain a working model, users often need to try a number of options (e.g., featurization, training parameters, and datasets). 
 When experimenting with these options, users frequently analyze results together with the corresponding input data,  
 locate the code segment for unexpected outcome, and rerun the computation with the removal of suspicious data anomalies
 identified as bad by domain experts due to measurement error.
@@ -129,10 +129,10 @@ Commonly, they use a case-by-case solution to record necessary information, and 
 These solutions are often use case specific, performance degradation prone, and they can complicate code
 management due to the demand for multiple versions of a pipeline.
 Given that this is a repeated pattern taken on by users of the system, it is natural to add support 
-for flexible lineage specification, instrumentation and query.
+for ML pipeline diagnosis.
 
 In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained lineage information
-(data lineage at a structure cell level, e.g. elements in a matrix). 
+(data lineage at a structure cell level, e.g., elements in a matrix). 
 We assume an ML framework with a programming model that abstracts a pipeline as a chain of data transformations, such as KeystoneML
 which builds on top of Apache Spark, and use two building blocks: {\bf transformers} and {\bf estimators}.
 A {\bf transformer} applies a deterministic unary function to data items and produce new data items.
@@ -144,10 +144,10 @@ capture fine-grained lineage with a minimal performance penalty, and serve the l
 
 %answer sophisticated lineage query responsively( with query latency lower than 10~seconds~\cite{nielsen2009}).
 Lineage tracking has been investigated in many contexts.
-Existing lineage tracking system such as Chimera~\cite{foster02} and and Taverna~\cite{oinn02} can collect coarse-grained lineage 
+Existing systems such as Chimera~\cite{foster02} and Taverna~\cite{oinn02} can collect coarse-grained lineage 
 of files and computations for scientific workflow systems.
-The weak inversion and verification methods~\cite{woodruff97} for RDBMS-based visualization system 
-was proposed for queries that can tolerate inaccurate fine-grained lineage information.
+The weak inversion and verification methods~\cite{woodruff97} for the RDBMS-based visualization system 
+is proposed for queries that can tolerate inaccurate fine-grained lineage information.
 DeepDive~\cite{shin15} explores approximate inference for the incremental maintenance problem in the context of knowledge base system.
 Data warehouse fine-grained lineage capturing and serving is enabled by works~\cite{cui00, cui03}.
 Trio~\cite{widom04} tracks lineage for the RDBMS with cell mappings materialization at the same time of view queries.
@@ -158,18 +158,21 @@ SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineag
 Unfortunately, none of the existing lineage tracking systems are suitable for the distributed ML frameworks for three reasons.
 First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level lineage tracing and query.
 Second, the approximate fine-grained approaches, such as approximate inference, weak inversion and verification methods, 
-relax lineage accuracy thus can not provide accurate lineage information for ML pipeline diagnosis.
+relax lineage accuracy thus cannot provide accurate lineage information for ML pipeline diagnosis.
 Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed at
 the underlying system operators (e.g., SQL operators for RDMBS, aggregate-select-project-join operators in data warehouse, 
 mappers and reducers in MapReduce systems, and the pre-defined operators and UDFs in SciDB). 
-This approach is general for all workloads running on the system and completely transparent to users, 
-thus it gives users very limited flexibility for customized instrumentation (specification of lineage type and the data to be collected) 
-in the case even if users know the exact data to collect.
-Other challenges of building such an ML framework diagnostic system include the performance penalty introduced by 
+In contrast, ML frameworks do not have such a set of well-regulated low level operators,
+and an ML pipeline can be viewed as a chain of user-defined data transformations.
+%This approach is general for all workloads running on the system and completely transparent to users, 
+%thus it gives users very limited flexibility for customized instrumentation (specification of lineage type and the data to be collected) 
+%in the case even if users know the exact data to collect.
+Other challenges of building such an ML framework diagnostic system include the cost introduced by 
 lineage capturing and the low latency requirement for lineage queries.
 Table~\ref{tb:overhead} shows the performance penalty incurred by lineage capturing in recent work.
-According to the report~\cite{nielsen2009}, 1~second considered to be the boundary of though flow while 
-10~seconds considered as the boundary to loose a use's attention.
+In a human computer interaction system, according to the report~\cite{nielsen2009}, 
+1~second is considered to be the boundary of thought flow while 
+10~seconds is considered as the boundary to loose a use's attention.
 
 \begin{table}[t]
 \begin{center}
@@ -188,9 +191,10 @@ According to the report~\cite{nielsen2009}, 1~second considered to be the bounda
 \end{center}   
 \end{table}
 
-In this work, we present a lineage capturing interface that returns declaration and instrumentation flexibility to users. 
+Based on the fact of ML pipeline builders having deep understanding of data transformations,  
+we present a lineage capturing interface that returns declaration and instrumentation (what data to capture) flexibility to users. 
 By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
-(Figure~\ref{fig:conceptual} shows an conceptual illustration), we are able to identify seven primitive lineage types.
+(Figure~\ref{fig:conceptual} shows a conceptual illustration), we are able to identify seven primitive lineage types.
 Higher-dimensional space can collapse/expand to lower-dimensional spaces along one dimension at a time, 
 resulting in {\bf collapse} mapping (\textcircled{1}) and {\bf expansion} mapping (\textcircled{6}, \textcircled{7}). 
 A mapping between spaces with the same number of dimensions can be {\bf identity} mapping (\textcircled{5}), {\bf all} mapping (\textcircled{9}), 
@@ -198,7 +202,7 @@ A mapping between spaces with the same number of dimensions can be {\bf identity
 or {\bf join} mapping. 
 This interface covers 87\% (39 out of 45) of the data transformations in the current code base of KeystoneML. 
 For transformations that are not covered, the lineage capturing interface allows users to specify a customized mapping function.
-A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
+A formal definition of the mapping types is in \S\ref{sec:Map-Func}.
 
 \begin{figure}[t]
 \begin{center}
@@ -219,9 +223,9 @@ A formal definition of the mapping types is in \S\ref{sec:Design-Mapping}.
 \end{figure}
 
 
-We present SystemX, a lineage collecting and serving system that implements the above general solutions.
+We present SystemX, a lineage capturing and serving system that implements the above general solutions.
 SystemX is integrated with the KeystoneML~\cite{sparks15} distributed machine learning framework.
-SystemX interacts with KeystoneML at the transformer level, where the users can declare the lineage type and instrumentation.
+SystemX interacts with KeystoneML at the transformer level, where the users can declare the lineage type and customize instrumentation.
 SystemX exploits the  data structure metadata (e.g., the size of each dimension of a space) for mapping recording to reduce storage overhead.
 It also uses a high-order function approach and spatial index for geometry mapping which does not have a regular mapping pattern.
 SystemX collects six types of data for each transformer: the input dataset, the output dataset, the mapping between them
@@ -302,7 +306,7 @@ input(Coor:(Int,Int), Value:Double)
 output(Coor:(Int,Int), Value:Double)
 \end{lstlisting}
 
-The mapping between the input and output dataset is a left outer join of the the two tables with a mapping function.
+The mapping between the input and output dataset is a left outer join of the two tables with a mapping function.
 The Func() function returns the corresponding output elements given an input element. 
 It is a left outer join since an input element may not be corresponding to any output element.
 \begin{lstlisting}
@@ -341,7 +345,7 @@ on $mapping_i.outCoor = mapping_{i+1}.inCoor$.
 \label{sec:Map-Func}
 The mapping function {\bf Func()} contains the core information of the input and output element dependency.
 Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-dimensional vectors in the case
-of every output element depends on every input element. 
+of every output element depending on every input element. 
 To eliminate this polynomial explosion in space requirements, we identify seven primitive mapping functions.
 From higher dimension space to lower dimension space, the mapping can be {\bf collapse} or {\bf expansion}.
 Between the equal dimension spaces, the mapping can be {\bf identity}, {\bf all}, {\bf geometry}, {\bf lincom}, and {\bf join}.
@@ -358,7 +362,7 @@ Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with
 
 {\bf Collapse} mapping describes the mapping of a space collapsing into a one dimension lower space along one dimension which needs
 to be specified by the user. Examples include gray scaling a multiple channel image.
-{\bf Expansion} mapping is where a space expands to a one dimension lower space, e.g. expanding a matrix to a vector with column major.
+{\bf Expansion} mapping is where a space expands to a one dimension lower space, e.g., expanding a matrix to a vector with column major.
 In {\bf identity} mapping, each output element only depends on one element with the same coordinate in the input matrix.
 In {\bf all} mapping, each output element depends on all elements in the input matrix.
 {\bf Geometry} mapping describes the case where a group of output elements depend on a group of input elements.
@@ -410,7 +414,7 @@ Lineage offers a natural way for these users to hone in on the areas where two s
 As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
 It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors with additional location information about the location of the descriptor in the input image can improve classification performance.
 However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
-By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like a under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
+By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like an under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
 By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
 The query for this use case is applied on the metadata mapping table of the SIFTExtractor transformer.
 \begin{lstlisting}
@@ -461,7 +465,7 @@ SELECT outCoor FROM mapping WHERE inCoor = key;
 \label{sec:Back-Case-Cleaning}
 Another use of the lineage information is for users to apply a subset of the prepared dataset to fit the model. 
 The ML expert who is building a SIFTFisher pipeline, shown in Figure~\ref{fig:vocsiftfisher}, identifies bad 
-training data items due to measurement error (e.g. the images that have both dogs and cats). A natural 
+training data items due to measurement error (e.g., the images that have both dogs and cats). A natural 
 investigation is then to remove these images, and test if that improves prediction accuracy.
 
 With SystemX, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
@@ -476,7 +480,7 @@ preparation part (from PixelScaler to RowNormalizer), then feed the dataset to l
 \subsection{KeystoneML}
 In principle, SystemX is general for distributed ML frameworks whose programming interface can be abstracted as transformers and estimators.
 We integrate SystemX with KeystoneML to show the effectiveness of the design.
-KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application DAG and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
+KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application directed acyclic graph (DAG) and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 
 %\section{Formal Discussion}
@@ -506,19 +510,19 @@ KeystoneML is an application framework designed for the implementation of robust
 %as a set of one-dimensional elements.
 
 
-\begin{theorem}
-\label{thm:distributive}
-A data transformation f() is distributive if the mapping of f() is self-contained.
-\end{theorem}
+%\begin{theorem}
+%\label{thm:distributive}
+%A data transformation f() is distributive if the mapping of f() is self-contained.
+%\end{theorem}
 
-\begin{proof}
-By contradiction, assume f() is not distributive on collection $C$ of vectors  \{$v_1, v_2, ..., v_n$\}, then $\exists e \in v_j $ s.t. $f(v_i)$ takes as input.
-Then $e \in qBackward_f(qForward_f(v_i))$ and $e \in v_i$ which results in  $qBackward_f(qForward_f(v_i)) \nsubseteq v_i$, which contradicts the assumption.
-\end{proof}
+%\begin{proof}
+%By contradiction, assume f() is not distributive on collection $C$ of vectors  \{$v_1, v_2, ..., v_n$\}, then $\exists e \in v_j $ s.t. $f(v_i)$ takes as input.
+%Then $e \in qBackward_f(qForward_f(v_i))$ and $e \in v_i$ which results in  $qBackward_f(qForward_f(v_i)) \nsubseteq v_i$, which contradicts the assumption.
+%\end{proof}
 
-\begin{corollary}
-A sequence of data transformations ($s = {f_1, f_2, ..., f_n}$) is distributive if the mapping between the very input and output datasets is self-contained.
-\end{corollary}
+%\begin{corollary}
+%A sequence of data transformations ($s = {f_1, f_2, ..., f_n}$) is distributive if the mapping between the very input and output datasets is self-contained.
+%\end{corollary}
 
 
 %Since transformers operate at the data structure (vector, matrix, image) level, we use the notation
