@@ -135,9 +135,9 @@ for ML pipeline diagnosis.
 In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained data lineage.
 Compared to the coarse-grained lineage at file or relational table metadata level, fine-grained lineage is at data structure cell level, e.g., elements in a matrix. 
 We assume an ML framework with a programming model that abstracts a pipeline as a chain of data transformations, such as KeystoneML
-which builds on top of Apache Spark, and use two building blocks: {\bf transformers} and {\bf estimators}.
+which builds on top of Apache Spark~\cite{zaharia12}, and use two building blocks: {\bf transformers} and {\bf estimators}.
 A {\bf transformer} applies a deterministic unary function to data items and produce new data items.
-An {\bf estimator} takes a collection of data items, and feed them to a training procedure,  and produces a {\bf transformer}.
+An {\bf estimator} takes a collection of data items, feed them to a training procedure,  and produces a {\bf transformer}.
 We choose this model because users can declare and instrument lineage capturing directly in the transformer.
 This diagnostic system requires:
 \begin{shortlist}
@@ -177,7 +177,7 @@ which makes it difficult to design a general lineage capturing interface.
 %in the case even if users know the exact data to collect.
 Other challenges of building such an ML framework diagnostic system include the cost introduced by 
 lineage capturing and the low latency requirement for lineage queries to enable interactive diagnosis.
-Table~\ref{tb:overhead} shows the performance penalty incurred by lineage capturing in recent work.
+Table~\ref{tb:overhead} shows the performance penalty incurred by lineage capturing in recent works.
 
 \begin{table}[t]
 \begin{center}
@@ -271,13 +271,13 @@ This interface should be concise with a few variations and options.
 This interface should also be powerful in terms of data transformation coverage.
 This interface should be flexible so that users can decide how the lineage should be captured.
 
-SystemX requires a user interface for lineage query.
+The serving unit requires a user interface for lineage query.
 Users should be able to construct the pipeline lineage by chaining that of each transformer.
 SystemX should provide the forward query ({\bf qForward()}) and backward query ({\bf qBackward()}) functionality.
 %The single transformer lineage should be able to be replayed deterministically, meaning that with the same input dataset and transformer,
 %the lineage contains enough information with which users can reproduce the results.
 
-Lineage capturing in SystemX should add a minimal wall clock time overhead and space consumption.
+Lineage capturing in SystemX should add a minimal wall clock time overhead, memory usage and storage space.
 To enable interactive diagnosis, SystemX should be able to answer lineage queries with low latency.
 According to the report~\cite{nielsen2009}, 
 1~second in a human computer interaction system is considered to be the boundary of keeping a user's thought flow while 
@@ -286,7 +286,7 @@ According to the report~\cite{nielsen2009},
 \subsection{Pipeline and Datasets}
 \label{sec:Map-Pipe-Data}
 A dataset $I$ is defined as a collection of structured data. In the scope of this work, the supported structures are: 
-string, vector, matrix, and image, while users have the flexibility to declare data structures with higher dimensions.
+string, vector, matrix, and image, while users can define data structures with higher dimensions.
 A vector or a string is a one dimensional data structure and a matrix is two dimensional. 
 For simplicity, a string is viewed as a vector.
 An image is a three dimensional data structure that is defined by the height, the width and the number
@@ -302,7 +302,7 @@ Each transformer $T_i$ takes a dataset $I_i$ as its input, and produces $I_{i+1}
 $I_{i+1} = T_i(I_i)$. 
 Especially, the output of the whole pipeline is denoted as $O = I_{n+1}$
 
-To simplify the discussion, we use the vector collection (a 2D space) as the input and output data structures as the example.
+To simplify the discussion, we use a vector collection (a 2D space) as the input and output data structures as the example.
 Also we only present the definition of forward query given that 
 backward query can be derived by reversing the table order in the join operation.
 
@@ -353,7 +353,7 @@ on $mapping_i.outCoor = $\\$mapping_{i+1}.inCoor$.
 \subsection{Mapping Function}
 \label{sec:Map-Func}
 The mapping function {\bf Func()} contains the core information of the input and output element dependency.
-Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-dimensional vectors in the case
+Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-element vectors in the case
 of every output element depending on every input element. 
 To eliminate this polynomial explosion in space requirements, we identify seven primitive mapping functions.
 From higher dimension space to lower dimension space, the mapping can be {\bf collapse} or {\bf flatten}.
@@ -369,10 +369,10 @@ Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with
 \end{center}
 \end{figure}
 
-{\bf Collapse} mapping describes the mapping of a space collapsing into a one dimension lower space along one dimension which needs
+{\bf Collapse} mapping describes the a space collapsing into a lower space along one dimension which needs
 to be specified by the user. Examples include gray scaling a multiple channel image.
-{\bf Flatten} mapping is where a space flattens to a one dimension lower space, e.g., flattening a matrix to a vector with column major.
-In {\bf identity} mapping, each output element only depends on one element with the same coordinate in the input matrix.
+{\bf Flatten} mapping is where a space flattens to a one-dimension lower space, e.g., flattening a matrix to a vector with column major.
+In {\bf identity} mapping, each output element only depends on the element with the identical coordinate in the input matrix.
 In {\bf all} mapping, each output element depends on all elements in the input matrix.
 {\bf Geometry} mapping describes the case where a group of output elements depend on a group of input elements.
 {\bf Lincom} mapping describes the data dependencies in a linear model.
@@ -402,7 +402,7 @@ To motivate SystemX, we present three representative use cases of using fine-gra
 \subsection{KeystoneML}
 In principle, SystemX is general for distributed ML frameworks whose programming interface can be abstracted as transformers and estimators.
 We integrate SystemX with KeystoneML to show the effectiveness of the design.
-KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application directed acyclic graph (DAG) and optimized before execution. Current optimizations include online decisions about materialization of intermediate state, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
+KeystoneML is an application framework designed for the implementation of robust large-scale machine learning pipelines. Built on the principles of declarative programming and modular design, KeystoneML provides a light-weight and elegant API that allows users to describe these pipelines as the composition of two types of operator--transformers, which perform deterministic data transformation, and estimators, which ``learn'' transformers based on training data. KeystoneML pipelines are fit and executed in parallel using Apache Spark. These pipelines are compiled into an application directed acyclic graph (DAG) and optimized before execution. Current optimizations include online decisions about intermediate state materialization, as well as standard optimizations such as common subexpression elimination. KeystoneML includes a library of standard feature extractors in domains including computer vision, audio, and text processing, as well as standard statistical procedures and Estimators for several types of machine learning model.
 
 \subsection{Use Cases}
 \label{sec:Back-cases}
@@ -426,12 +426,13 @@ Lineage offers a natural way for these users to hone in on the areas where two s
 \end{figure*}
 
 As a concrete example, consider the SIFTFisher pipeline, shown as Figure~\ref{fig:vocsiftfisher}. 
-It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors with additional location 
-of the descriptor in the input image can improve classification performance.
+It has been shown that augmenting traditional SIFT~\cite{lowe99} (Scale-invariant feature transform) descriptors 
+with their locations in the input image can improve classification performance.
 However, when we first developed such a pipeline, our results conflicted with published work indicating that these features provided a statistically significant improvement in classification accuracy.
 By employing lineage based debugging, we could isolate exactly where in the pipeline our calculations diverged from the original features, and diagnose impacts seen downstream like an under-fit GMM (Gaussian Mixture Model), and trace the ultimate lack of classification improvement to a bug in the underlying C library which we called into.
-By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. The SIFT feature visualization involves backward query on the lineage of the SIFTExtractor transformer and highlights of the corresponding input pixels.
-A backward query on the metadata mapping table of the SIFTExtractor transformer will return the corresponding input pixel positions.
+By visualizing the features we could see that the new features added to our model did not correspond to positions in the image, but rather contained values outside of a suitable range for these features, which turned out to be randomly allocated memory. 
+The SIFT feature visualization involves a  backward query on the SIFTExtractor transformer lineage. 
+
 \begin{lstlisting}
 mapping(inCoor:(Int,Int,Int),outCoor:(Int,Int,Int))
 
@@ -452,7 +453,7 @@ and retrospection of supporting input data.
 \end{figure}
 
 One such use case is results inspection in the SourceExtractor pipeline, shown in Figure~\ref{fig:sourceextractor},
-that processes images from the telescopes and produces astronomical object catalogs. 
+that processes telescope images and produces astronomical object catalogs. 
 The astronomical object catalog includes the position, shape, and other statistical properties of the object.
 In this case, astronomers find the bright objects over a threshold and validate that these objects are indeed astronomical objects rather
 than noise caused by cosmic rays.
@@ -616,7 +617,7 @@ preparation part (from PixelScaler to RowNormalizer), then feed the dataset to l
 SystemX is designed as an ML pipeline diagnostic tool. 
 It has two units: the capturing unit and the serving unit.
 The capturing unit requires a user-friendly, flexible, and powerful interface for lineage type declaration and instrumentation.
-Performance wise, the lineage capturing unit should add minimal overhead in running time and storage.
+Performance wise, the lineage capturing unit should add minimal overhead in running time, memory usage and storage space.
 The serving unit should be able to answer lineage queries with low latency to enable interactive diagnostics.
 
 In this section and next, we present the design and implementation to address the above goals.
@@ -696,7 +697,7 @@ SystemX infers metadata of data structures automatically.
 The metadata  of a data structure can be one dimensional (with type of Int), two dimensional (with type of (Int, Int)), and etc.
 For example, in an {\bf all} mapping between two matrices of 5 rows and 5 columns,
 the mapping is recorded as {\it AllMapping(Meta(5, 5), Meta(5,5))}. 
-So upon forward query, the {\bf all} mapping returns the coordinates of all 25 elements in the output matrix by only looking into the matrix metadata.
+So upon forward query, the mapping returns the coordinates of all 25 coordinates in the output matrix by only looking into the matrix metadata.
 SystemX also uses this data structure metadata to check out-of-bound errors if the given key is outside the space of the data structure.
 
 For {\bf geometry} mapping type, the mapping is arbitrary and cannot benefit from data structure metadata, 
@@ -744,8 +745,8 @@ SystemX exposes a simple interface for two dimensional shapes as special cases.
 Users can pass in the geographical information directly to declare rectangle, circle, and ellipse.
 
 Using the high-order function makes query difficult. 
-Both the input elements and output elements are encoded with a high-order function, 
-and there is a list of such function pairs between two data structures.
+Both the input elements and output elements are encoded with high-order functions, 
+and there is a list of such function tuple between two data structures.
 A forward query that takes an input element as key thus needs to iterate over all input functions and test if the key is in the function or not.
 If the key is in an input function, it then returns the mapping output function, and expands the function to a set of coordinates.
 The time complexity of query over geometry mapping is then $O(N)$, assuming there are $N$ tuples in the list.
