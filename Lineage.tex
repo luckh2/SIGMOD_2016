@@ -1018,8 +1018,8 @@ The Direct strategy crashes due to insufficient memory.
 NoIndex strategy shows a high query latency which quickly grows over 10,000~ms with 100 keys.
 The other three strategies show a similar scalability, while KMeans-1 runs 17.9\% and 25.1\% faster than RTree with 1K and 10K keys, respectively.
 KMeans-5 runs  31.1\% and 35.2\% faster with 1K and 10K keys, respectively.
-This result is as expected as the Archery implementation hard codes the number of objects as 50 for each leaf node, which results in a deep tree.
-While the KMeans strategies are building two-level trees.
+%This result is as expected as the Archery implementation hard codes the number of objects as 50 for each leaf node, which results in a deep tree.
+%While the KMeans strategies are building two-level trees.
 
 \begin{figure}[t]
 \begin{center}
