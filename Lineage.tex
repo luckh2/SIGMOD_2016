@@ -1141,7 +1141,7 @@ time scales better than or similar to the ML pipelines.
 This is due to the fact that SystemX captures and stores the lineage in a distributed manner. 
 The metadata mapping capturing is more likely to be impacted by the ML pipeline compared to the case where both metadata
 mapping and datasets are captured, since it is a relatively less data-intensive procedure.
-For both pipelines, geometry lineage dominates the wall clock time overhead of lineage capturing.
+For both pipelines, geometry lineage dominates the wall clock time overhead when only capturing the metadata mapping.
 
 
 \subsection{Query Latency and Scalability}
@@ -1233,10 +1233,10 @@ time by 16.4x (from $421.3\pm3.8$~seconds to $25.7\pm0.3$~seconds).
 {\bf Coarse-grained Lineage:} Researchers have extensively studied data lineage (in some cases referred as data provenance) in different contexts.
 Scientific workflow systems such as  Chimera~\cite{foster02}, Taverna~\cite{oinn02}, and ESSW~\cite{frew01}, 
 collect coarse-grained lineage of file metadata and computation. 
-Similar work has been well summarized by survey~\cite{simmhan05, freire08, bose05}.
-Recent work~\cite{altintas10} investigates how to integrate the lineage of workflow executions
+Similar work has been well summarized by surveys~\cite{simmhan05, freire08, bose05}.
+Recent work by Altintas~\cite{altintas10} investigates how to integrate the lineage of workflow executions
 in a collaborative environment. Coarse-grained lineage is useful in these systems to trace the data and code dependencies.
-However, the coarse-grained lineage lacks the details for cell level diagnosis of ML pipelines.
+However, the coarse-grained lineage lacks the details at cell level for ML pipelines diagnosis.
 
 {\bf Fine-grained Lineage:} Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
 data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
@@ -1246,9 +1246,9 @@ All these systems design lineage capturing interface on the well-defined low lev
 For example, the data warehouse has the aggregate, select, project, join operators. 
 RDMBS has its SQL operators. MapReduce systems formulates the computation as mappers and reducers.
 The curated database defines four operators of insert, delete, copy and paste.
-Though lineage capturing interface designed in these systems is general to support all applications running on top these systems,
+Though lineage capturing interface designed in these systems is general to support all applications running on top them,
 they are not suitable for the ML pipeline diagnostics.
-This is because ML frameworks' lack of well-defined low level operators since an ML pipeline is a sequence of user-defined 
+This is because ML frameworks do not have such a set of well-defined low level operators since an ML pipeline is a sequence of user-defined 
 data transformations.
 
 One of SubZero's contributions is the region lineage that collects fine-grained lineage for UDFs besides the built-in operators in SciDB. 
@@ -1264,7 +1264,7 @@ These approaches do not fit the ML pipeline lineage scenario since they either l
 excessive performance penalty.
 The Arnold system~\cite{devecsery14} captures fine-grained lineage at operating system process level by recoding
 all non-deterministic data such as the order, return values, modified memory addresses, and many others. 
-This approach can collect fine-grain lineage for any process running on top of the operating system, however
+This approach can collect fine-grain lineage for any process in the operating system, however
 it loses track of the upper level data structures (e.g., vector, matrix, images), which are fundamental to ML pipelines.
 One step beyond fine-grained lineage, researches~\cite{meliou10, meliou11} explore the causality and responsibility
 of inputs to the results. Though the causality and responsibility is relatively easier for data transformations in ML pipelines,
@@ -1276,15 +1276,15 @@ model and predictions.
 \label{sec:Conclusion}
 SystemX enables interactive ML pipeline diagnostics by leveraging the fine-grained data lineage.
 SystemX exposes an elegant and powerful interface for users to specify and instrument lineage capuring.
-This interface has a coverage of 87\% of the transformers and estimators in the current KeystoneML code base. 
+This interface has a coverage of 87\% of the transformers in the current KeystoneML code base. 
 Combining the metadata of data structures, the high-order function approach and spatial indexing
 strategy, SystemX is able to answer typical queries within a few seconds. 
 Practically, SystemX introduces a wall clock time overhead of 16\%-54\% depending on the pipeline 
 and use case.
 
 As future work, we are investigating the diagnosability inside the training process of the estimator. 
-We seek to provide the users with the fine-grained lineage for an estimator to answer queries of 
-supporting training samples for a prediction and the impact of certain feature removal or training data removal. 
+We seek to provide the users with the fine-grained lineage for an estimator to answer queries such as
+finding supporting training samples for a prediction and the impact of certain feature removal or training data item removal. 
 We are also working on the optimization of large scale query on a single data structure.
 
 %ACKNOWLEDGMENTS are optional
