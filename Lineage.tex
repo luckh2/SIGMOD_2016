@@ -164,7 +164,7 @@ solutions for MapReduce systems, and capture lineage on low level operators such
 SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10}, has a similar lineage capturing interface on predefined operators and UDFs.
 
 Unfortunately, the existing lineage tracking systems are not suitable for the distributed ML frameworks for three reasons.
-First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level mapping.
+First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details of cell-level mapping.
 Second, the approximate approaches, such as the weak inversion and verification methods, 
 relax lineage accuracy thus cannot be used for ML pipeline diagnosis.
 Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed at
