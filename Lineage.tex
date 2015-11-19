@@ -53,6 +53,7 @@
 \usepackage{url}
 \usepackage{dblfloatfix}
 \usepackage{fixltx2e}
+\usepackage{balance}
 \usepackage{listings}
 \lstset{language=sql, escapeinside={\$}, basicstyle=\small, mathescape, escapeinside={\%*}{*)}}
 
@@ -102,7 +103,7 @@ SystemX exposes a concise yet powerful API, derived from \emph{primitive lineage
 It captures fine-grained data lineage for each  data transformation by recording the input datasets, the output datasets and the cell-level mapping between them. 
 It also collects all information that is needed to reproduce the computation.
 SystemX efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
-For a single transformation, SystemX's high-order function mapping strategy can reduce the storage consumption by up to 
+For a single transformation, SystemX's high-order function approach can reduce the storage consumption by up to 
 45x compared to the baseline of element-wise mapping recording.
 Using the spatial index allows SystemX to speed up lineage query performance by a further 2x-31x. 
 SystemX can answer the real use case lineage queries within a few seconds, 
@@ -1294,6 +1295,7 @@ This research is supported in part by NSF CISE Expeditions Award CCF-1139158, LB
 % initial runs of your .tex file to
 % produce the bibliography for the citations in your paper.
 \bibliographystyle{abbrv}
+\balance
 \bibliography{Lineage} % sigproc.bib is the name of the Bibliography in this case
 % You must have a proper ".bib" file
 %  and remember to run:
