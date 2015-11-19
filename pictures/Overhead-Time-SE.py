@@ -26,7 +26,7 @@ ax.set_xlabel('Scale (Number of Machines)', size='x-large')
 ax.set_ylabel('Wall Clock Time (seconds)', size='x-large', labelpad=20)
 ax.set_xticks(ind+0.4)
 ax.set_xticklabels( ('8', '16', '32', '64'), size='x-large') 
-ax.legend( (rects1[0], rects2[0]), ('SE Meta-only', 'SE Meta+Data'), loc='best', ncol=2)
+ax.legend( (rects1[0], rects2[0]), ('SE Meta-only', 'SE Meta+Data'), loc='best')
 ax.set_yticklabels((0, 100, 200, 300, 400, 500), size='large')
 
 
