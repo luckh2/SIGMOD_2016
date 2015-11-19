@@ -136,7 +136,7 @@ In this paper, we describe the design of a diagnostic system for distributed ML 
 Compared to the coarse-grained lineage at file or relational table metadata level, fine-grained lineage is at data structure cell level, e.g., elements in a matrix. 
 We assume an ML framework with a programming model that abstracts a pipeline as a chain of data transformations, such as KeystoneML
 which builds on top of Apache Spark~\cite{zaharia12}, and use two building blocks: {\bf transformers} and {\bf estimators}.
-A {\bf transformer} applies a deterministic unary function to data items and produce new data items.
+A {\bf transformer} applies a deterministic unary function to data items and produce new ones.
 An {\bf estimator} takes a collection of data items, feed them to a training procedure,  and produces a {\bf transformer}.
 We choose this model because users can declare and instrument lineage capturing directly in the transformer.
 This diagnostic system requires:
@@ -144,7 +144,7 @@ This diagnostic system requires:
 \item{} A flexible interface for users to instrument how and what to capture
 \item{} A minimal lineage capturing wall clock time cost
 \item{} A minimal lineage storage space
-\item{} Low latency for lineage query to enable interactive diagnosis
+\item{} Low latency lineage query to enable interactive diagnosis
 \end{shortlist}
 %This diagnostic system enables users to specify the data transformation lineage with a concise interface, customize the instrumentation, 
 %capture fine-grained lineage with a minimal performance penalty, and serve the lineage query 
@@ -155,13 +155,13 @@ Lineage tracking has been investigated in many contexts.
 Existing systems such as Chimera~\cite{foster02} and Taverna~\cite{oinn02} can collect coarse-grained lineage 
 of files and computations for scientific workflow systems.
 The weak inversion and verification methods~\cite{woodruff97} for the RDBMS-based visualization system 
-is proposed to track approximate lineage.
+are proposed to track approximate lineage.
 %DeepDive~\cite{shin15} explores approximate inference for the incremental maintenance problem in the context of knowledge base system.
 Data warehouse fine-grained lineage capturing and serving is enabled by the works of Cui and Widom~\cite{cui00, cui03}.
 Trio~\cite{widom04} records lineage for the RDBMS at query execution time.
-Works in fine-grained lineage capturing such as RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} present
+RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} present
 solutions for MapReduce systems, and capture lineage on low level operators such as mappers and reducers.
-SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10} has a similar lineage capturing interface on predefined SciDB operators and UDFs.
+SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10}, has a similar lineage capturing interface on predefined operators and UDFs.
 
 Unfortunately, the existing lineage tracking systems are not suitable for the distributed ML frameworks for three reasons.
 First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the details for cell-level mapping.
