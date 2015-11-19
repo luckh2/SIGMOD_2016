@@ -98,15 +98,15 @@
 \begin{abstract}
 We present the SystemX lineage system to enable the diagnosis of distributed machine learning (ML) pipelines by leveraging the fine-grained
 data lineage.  
-SystemX exposes a concise yet powerful API, derived from \emph{primitive lineage types}, and collects fine-grained data lineage for each 
-data transformation by recording the input datasets, the output datasets and the cell-level mapping between them, along
-with all information needed to reproduce the computation.
+SystemX exposes a concise yet powerful API, derived from \emph{primitive lineage types}. 
+It captures fine-grained data lineage for each  data transformation by recording the input datasets, the output datasets and the cell-level mapping between them. 
+It also collects all information that is needed to reproduce the computation.
 SystemX efficiently enables data anomaly removal and computation replay, code debugging, and result analysis.
 For a single transformation, SystemX's high-order function mapping strategy can reduce the storage consumption by up to 
-45x comparing to the element-wise mapping recording.
-The spatial index allows SystemX to speed up lineage query performance by a further 2x-31x. 
+45x comparing to the baseline of element-wise mapping recording.
+Using the spatial index allows SystemX to speed up lineage query performance by a further 2x-31x. 
 SystemX can answer the real use case lineage queries within a few seconds, 
-which is low enough to keep the pace with users' diagnostic thought flow.
+which is low enough to enable interactively diagnosis of ML pipelines.
 \end{abstract}
 
 % A category with the (minimum) three required fields
@@ -126,13 +126,13 @@ When experimenting with these options, users frequently analyze results together
 locate the code segment for unexpected outcome, and rerun the computation with the removal of suspicious data anomalies
 identified as bad by domain experts due to measurement error.
 Commonly, they use a case-by-case solution to record necessary information, and store such information in persistent storage for examination.
-These solutions are often use case specific, performance degradation prone, and they can complicate code
+These solutions are often use case specific, prone to performance degradation , and they can complicate code
 management due to the demand for multiple versions of a pipeline.
 Given that this is a repeated pattern taken on by users of the system, it is natural to add support 
 for ML pipeline diagnosis.
 
-In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained lineage information
-(data lineage at a structure cell level, e.g., elements in a matrix). 
+In this paper, we describe the design of a diagnostic system for distributed ML frameworks by leveraging the fine-grained data lineage.
+Compared to the coarse-grained lineage at file or relational table metadata level, fine-grained lineage is at structure cell level, e.g., elements in a matrix. 
 We assume an ML framework with a programming model that abstracts a pipeline as a chain of data transformations, such as KeystoneML
 which builds on top of Apache Spark, and use two building blocks: {\bf transformers} and {\bf estimators}.
 A {\bf transformer} applies a deterministic unary function to data items and produce new data items.
@@ -160,7 +160,7 @@ First, the coarse-grained lineage information collected by scientific workflow s
 Second, the approximate fine-grained approaches, such as approximate inference, weak inversion and verification methods, 
 relax lineage accuracy thus cannot provide accurate lineage information for ML pipeline diagnosis.
 Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed at
-the underlying system operators (e.g., SQL operators for RDMBS, aggregate-select-project-join operators in data warehouse, 
+the underlying system operators (e.g., SQL operators for RDBMS, aggregate-select-project-join operators in data warehouse, 
 mappers and reducers in MapReduce systems, and the pre-defined operators and UDFs in SciDB). 
 In contrast, ML frameworks do not have such a set of well-regulated low level operators,
 and an ML pipeline can be viewed as a chain of user-defined data transformations.
