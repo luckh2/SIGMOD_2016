@@ -1099,6 +1099,10 @@ By examining the pipeline measurements, we confirm that the scalability of the m
 by the pipeline performance.
 From 4 to 8 machines, the meta-only setting shows a super linear speedup, this is because the pipeline is memory-bounded on 4 machines
 and using 8 machines removes this bottleneck.
+On 16 machine scale, the SIFTExtractor counts for 89.4\% of the 226~seconds wall clock time cost in the meta-only case.
+This is because it is instrumented as the geometry mapping type.
+It also implies that the other SystemX's mapping types have low cost to be captured.
+The rest of the transformers contributes only 10.6\% in this pipeline. 
 
 \begin{figure}[t]
 \begin{center}
