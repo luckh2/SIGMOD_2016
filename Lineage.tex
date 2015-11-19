@@ -781,12 +781,12 @@ with mappings that are not directly covered by the primitive types.
 All mapping, identity mapping, lincom mapping, and join mapping are symmetric, 
 meaning the inverse of these two mappings are of the same mapping type.
 Collapse mapping and flatten mapping are not symmetric, but the mapping inversion can be inferred
-given the data structure metadata (the number and size of dimensions of an n-dimensional space). For example, 
+given the data structure metadata (the number and size of dimensions of a space). For example, 
 in the collapse case shown early in Figure~\ref{fig:narrowmapping}, a matrix with three rows and three columns
 collapses into a vector along the row dimension. Thus a mapping inversion of an element of the vector
 is all elements in the corresponding row in the matrix. 
 The inversion of flatten mapping can also be inferred with simple calculation.
-The inversion of geometry mapping is enabled by switch the order of the order of each geometry pairs.
+The inversion of geometry mapping is enabled by switch the order of the order of each geometry tuple.
 
 
 Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the collapse mapping and flatten mapping
