@@ -195,8 +195,8 @@ Based on the fact of ML pipeline builders having deep understanding of data tran
 we present a lineage capturing interface that returns declaration and instrumentation (what data to capture) flexibility to users. 
 By formulating the cell level mapping of an ML pipeline as a sequence of multi-dimensional space transformations
 (Figure~\ref{fig:conceptual} shows a conceptual illustration), we are able to identify seven primitive lineage types.
-Higher-dimensional space can collapse/expand to lower-dimensional spaces along one dimension at a time, 
-resulting in {\bf collapse} mapping (\textcircled{1}) and {\bf expansion} mapping (\textcircled{6}, \textcircled{7}). 
+Higher-dimensional space can collapse/flatten to lower-dimensional spaces along one dimension at a time, 
+resulting in {\bf collapse} mapping (\textcircled{1}) and {\bf flatten} mapping (\textcircled{6}, \textcircled{7}). 
 A mapping between spaces with the same number of dimensions can be {\bf identity} mapping (\textcircled{5}), {\bf all} mapping (\textcircled{9}), 
 {\bf geometry} mapping (\textcircled{2}, \textcircled{4}), {\bf lincom} (short for linear combination) mapping (\textcircled{3}, \textcircled{8}),
 or {\bf join} mapping. 
@@ -347,7 +347,7 @@ The mapping function {\bf Func()} contains the core information of the input and
 Recording the element-wise dependency can take up to $O(kN^2)$ space given k N-dimensional vectors in the case
 of every output element depending on every input element. 
 To eliminate this polynomial explosion in space requirements, we identify seven primitive mapping functions.
-From higher dimension space to lower dimension space, the mapping can be {\bf collapse} or {\bf expansion}.
+From higher dimension space to lower dimension space, the mapping can be {\bf collapse} or {\bf flatten}.
 Between the equal dimension spaces, the mapping can be {\bf identity}, {\bf all}, {\bf geometry}, {\bf lincom}, and {\bf join}.
 Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with the mapping highlighted with color scheme.
 
@@ -362,7 +362,7 @@ Figure~\ref{fig:narrowmapping} shows the seven primitive mapping functions, with
 
 {\bf Collapse} mapping describes the mapping of a space collapsing into a one dimension lower space along one dimension which needs
 to be specified by the user. Examples include gray scaling a multiple channel image.
-{\bf Expansion} mapping is where a space expands to a one dimension lower space, e.g., expanding a matrix to a vector with column major.
+{\bf Flatten} mapping is where a space expands to a one dimension lower space, e.g., expanding a matrix to a vector with column major.
 In {\bf identity} mapping, each output element only depends on one element with the same coordinate in the input matrix.
 In {\bf all} mapping, each output element depends on all elements in the input matrix.
 {\bf Geometry} mapping describes the case where a group of output elements depend on a group of input elements.
@@ -654,7 +654,7 @@ Table~\ref{tb:lineage-interface} summarizes the lineage types and parameters pas
     \begin{tabular}{ | p{8cm}|}
     \hline
     CollapseLineage(in, out, transformer, dimension) \\ \hline 
-    ExpansionLineage(in, out, transformer, dimension) \\ \hline
+    FlattenLineage(in, out, transformer, dimension) \\ \hline
     IdentityLineage(in, out, transformer) \\ \hline
     AllLineage(in, out, transformer) \\ \hline
     GeoLineage(in, out, transformer, mappingCollection) \\ \hline
@@ -702,7 +702,7 @@ This intuitive solution takes a tremendous amount of space to materialize the ma
     \begin{tabular}{ | p{8cm}|}
     \hline
     CollapseMapping(inMeta, outMeta, dimension) \\ \hline 
-    ExpansionMapping(inMeta, outMeta, dimension) \\ \hline
+    FlattenMapping(inMeta, outMeta, dimension) \\ \hline
     IdentityMapping(inMeta, outMeta) \\ \hline
     AllMapping(inMeta, outMeta) \\ \hline
     GeometryMapping(inMeta, outMeta, mappingCollection) \\ \hline
@@ -770,23 +770,23 @@ All mapping, identity mapping, lincom mapping, and join mapping are symmetric,
 meaning the inverse of these two mappings are also all mapping, identity mapping, 
 lincom mapping and join mapping respectively.
 
-{\bf Collapse mapping} and {\bf expansion mapping} are not symmetric, but the mapping inversion can be inferred
+{\bf Collapse mapping} and {\bf flatten mapping} are not symmetric, but the mapping inversion can be inferred
 given the data structure metadata (the number and size of dimensions of an n-dimensional space). For example, 
 in the collapse case shown early in Figure~\ref{fig:narrowmapping}, a matrix with three rows and three columns
 collapses into a vector along the row dimension. Thus a mapping inversion of an element of the vector
 is all elements in the corresponding row in the matrix. 
-The inversion of expansion mapping can also be inferred with simple calculation.
+The inversion of flatten mapping can also be inferred with simple calculation.
 The inversion of geometry mapping is enabled by switch the order of the order of each geometry pairs.
 
 For mappings that are not covered by the seven primitive types, SystemX allows users to define {\bf custom} mapping
 which requires two functions, one for forward mapping and the other for backward mapping.
 
 \subsection{Other Mapping Cases}
-Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the collapse mapping and expansion mapping
+Among the seven mapping types defined in \S\ref{sec:Design-Lineage}, the collapse mapping and flatten mapping
 map spaces that have different dimensions. By definition, they only maps from a higher-dimensional space to a lower-dimensional space.
 A transformer that reduces a lower-dimensional space to a higher-dimensional space, e.g., transforming a vector into a matrix, can use
-the same ExpansionLineage type for declaration based on the fact that the reverse mapping of this transformation is a
-expansion mapping. SystemX can infer the mapping direction based on the metadata of data structures 
+the same FlattenLineage type for declaration based on the fact that the reverse mapping of this transformation is a
+flatten mapping. SystemX can infer the mapping direction based on the metadata of data structures 
 (the number and size of dimensions of an n-dimensional space). 
 A similar solution is used for the reverse of collapse mapping.
 
@@ -1017,7 +1017,7 @@ While the KMeans strategies are building two-level trees.
 
 \begin{figure}[t]
 \begin{center}
-    \includegraphics[width=85mm]{pictures/SIFTQuery-Time}
+    \includegraphics[width=85mm]{pictures/SIFTQuery-Time-tuned}
 \caption {Query performance profile of the geometry mapping with four indexing strategies
     \label{fig:sift-query}
 }
@@ -1163,7 +1163,7 @@ Table~\ref{tb:typequery-stats} shows the metadata settings of the input and outp
     All & Vector(40960) & Vector(40960) \\ \hline
     Identity & Matrix(80, 512) & Matrix(80, 512) \\ \hline
     LinCom & Vector(40960) & Vector(20) \\ \hline
-    Expansion & Matrix(80, 512) & Vector(40960) \\ \hline
+    Flatten & Matrix(80, 512) & Vector(40960) \\ \hline
     Collapse & Image(375, 500, 3) & Matrix(375, 500) \\ \hline
     Join & Matrix(500, 300) & Matrix(300, 500) \\ \hline
     Geometry& \shortstack[l]{Matrix(300, 500), \\60K geometries} &  \shortstack[l]{Matrix(128, 60000), \\60K geometries} \\ \hline
@@ -1173,7 +1173,7 @@ Table~\ref{tb:typequery-stats} shows the metadata settings of the input and outp
 \end{center}   
 \end{table}
 
-Given the fact that all mapping, identity mapping, lincom mapping, expansion mapping, collapse mapping, and join mapping
+Given the fact that all mapping, identity mapping, lincom mapping, flatten mapping, collapse mapping, and join mapping
 only involves trivial computation, queries with 1 to 10K keys show latency under 200~ms which is generally the Spark operating latency. 
 These queries show performance degradation with 100K keys (generally around 1~second). 
 From 100K keys, the query latency increases proportionally with the key number as shown with the 1M key performance.

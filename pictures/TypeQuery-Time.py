@@ -40,7 +40,7 @@ ax.set_xlabel('Lineage Type', size='x-large')
 ax.set_ylabel('Query Latency (ms)', size='x-large', labelpad=20)
 ax.set_yscale('log')
 ax.set_xticks(ind+0.45)
-ax.set_xticklabels( ('All', 'Identity', 'LinCom', 'Expansion', 'Collapse', 'Join', 'Geometry'), size='x-large') 
+ax.set_xticklabels( ('All', 'Identity', 'LinCom', 'Flatten', 'Collapse', 'Join', 'Geometry'), size='x-large') 
 ax.legend( (rects1[0], rects2[0], rects3[0], rects4[0], rects5[0]), ('Random', 'Batch1K', 'Batch10K', 'Batch100K', 'Batch1M'), loc='best', ncol=3)
 
 #d = .015
