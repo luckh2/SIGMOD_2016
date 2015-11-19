@@ -843,7 +843,7 @@ Table~\ref{tb:example} shows the mapping for each element and the 2D geometry ma
 
 \begin{table}[h]
 \begin{center}
-    \caption{Element-wise mapping and regressed geometry mapping of the example in Figure~\ref{fig:example}}
+    \caption{Element-wise mapping and geometry mapping of the example in Figure~\ref{fig:example}}
     \begin{scriptsize}
     \begin{tabular}{ | c | c | c | c |}
     \hline
@@ -891,7 +891,7 @@ The time complexity of building index and query are $O(N*M)$ and $O(1)$, respect
 R-tree~\cite{guttman1984} has been introduced to index multidimensional information.
 To simplify the discussion, SystemX uses the example shown in Figure~\ref{fig:example} and build the index in a two dimensional space.
 The average query time complexity is $O(logN)$, while the worst case is $O(N)$. 
-The worst case happens is querying an element in a region where all leaf nodes overlap.
+The worst case happens when querying an element in a region where all leaf nodes overlap.
 Variants of R-tree, such as R+-tree~\cite{sellis1987} and R*-tree~\cite{beckmann1990}, 
 seek to improve the worst case query by minimizing the overlapped geometry at leaf nodes 
 by paying the index building cost.
