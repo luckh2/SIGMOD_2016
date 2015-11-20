@@ -905,9 +905,9 @@ The index is built upon the bounding boxes.
 The query of an input element (0,0) in the R-tree returns a tuple of the bounding box (center: (0.5,0.5), height:1, width:1) and circle\_0.
 The query returns the output elements expanded from Rect\_0 only if the input element is within circle\_0.
 
-The time complexity of building an R-tree is $O(N)$.
-The worst case time complexity of query an R-tree is $O(N)$.
-And the space complexity for {\bf RTree} index is $O(logN)$.
+%The time complexity of building an R-tree is $O(N)$.
+%The worst case time complexity of query an R-tree is $O(N)$.
+%And the space complexity for {\bf RTree} index is $O(logN)$.
 
 \subsubsection{KMeans Index}
 We design a two-layer tree index with its leaf nodes as a list of geometries and its non-leaf nodes as the bounding box (same idea as that of R-tree)
@@ -921,9 +921,9 @@ Thus there are $k$ non-leaf nodes.
 A worst case query needs to traverses all $k$ non-leaf nodes and all $\frac{N}{k}$ leaf node in the cluster.
 $k+\frac{N}{k}$ has its minimum when $k=\sqrt{N}$. 
 
-The time complexity of building the {\bf KMeans} index is $O(N^{1.5})$.
-The worst case query time complexity is $O(\sqrt{N})$.
-The space complexity of {\bf KMeans} is $O(\sqrt{N})$.
+%The time complexity of building the {\bf KMeans} index is $O(N^{1.5})$.
+%The worst case query time complexity is $O(\sqrt{N})$.
+%The space complexity of {\bf KMeans} is $O(\sqrt{N})$.
 
 %\subsubsection{Index Strategy Asymptotical Comparison}
 %Table~\ref{tb:index-comparison} summarizes the index building time complexity, 
