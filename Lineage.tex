@@ -151,7 +151,7 @@ Our diagnostic system provides:
 Lineage tracking has been investigated in many contexts.
 Existing systems such as Chimera~\cite{foster02} and Taverna~\cite{oinn02} can collect coarse-grained lineage 
 at the level of files and computations for scientific workflow systems.
-The weak inversion and verification methods~\cite{woodruff97} for the RDBMS-based visualization systems 
+The weak inversion and verification methods~\cite{woodruff97} for RDBMS-based visualization systems 
 were proposed to track approximate lineage.
 %DeepDive~\cite{shin15} explores approximate inference for the incremental maintenance problem in the context of knowledge base system.
 Data warehouse fine-grained lineage capturing and serving is enabled by the works of Cui and Widom~\cite{cui00, cui03}.
@@ -160,7 +160,7 @@ RAMP~\cite{ikeda11, park11} and Newt~\cite{logothetis13} present
 solutions for MapReduce systems, and capture lineage on low level operators such as mappers and reducers.
 SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10}, has a similar lineage capturing interface on predefined operators and UDFs.
 
-Unfortunately, these existing lineage tracking systems are not suitable for the distributed ML frameworks for three reasons.
+Unfortunately, these existing lineage tracking systems are not suitable for distributed ML frameworks for three reasons.
 First, coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the necessary detail of cell-level mapping.
 Second, approximate approaches, such as the weak inversion and verification methods, 
 relax lineage accuracy thus cannot be used for diagnosing the correctness of ML pipelines.
