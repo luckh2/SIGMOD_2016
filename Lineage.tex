@@ -97,7 +97,7 @@
 \maketitle
 
 \begin{abstract}
-We present the SystemX lineage system to enable the diagnosis of distributed machine learning (ML) pipelines by leveraging the fine-grained
+We present the SystemX lineage system to enable the diagnosis of distributed machine learning (ML) pipelines by leveraging fine-grained
 data lineage.  
 SystemX exposes a concise yet powerful API, derived from \emph{primitive lineage types}. 
 It captures fine-grained data lineage for each  data transformation by recording the input datasets, the output datasets and the cell-level mapping between them. 
@@ -161,7 +161,7 @@ solutions for MapReduce systems, and capture lineage on low level operators such
 SubZero~\cite{wu13}, which is built on SciDB~\cite{brown10}, has a similar lineage capturing interface on predefined operators and UDFs.
 
 Unfortunately, these existing lineage tracking systems are not suitable for the distributed ML frameworks for three reasons.
-First, the coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the necessary detail of cell-level mapping.
+First, coarse-grained lineage information collected by scientific workflow systems (e.g., Chimera) lacks the necessary detail of cell-level mapping.
 Second, approximate approaches, such as the weak inversion and verification methods, 
 relax lineage accuracy thus cannot be used for diagnosing the correctness of ML pipelines.
 Third, the lineage capturing interface of Trio, RAMP, Newt, and SubZero is designed for
@@ -1233,7 +1233,7 @@ collect coarse-grained lineage of file metadata and computation.
 Similar work has been well summarized by surveys~\cite{simmhan05, freire08, bose05}.
 Recent work by Altintas~\cite{altintas10} investigates how to integrate the lineage of workflow executions
 in a collaborative environment. Coarse-grained lineage is useful in these systems to trace the data and code dependencies.
-However, the coarse-grained lineage lacks the details at cell level for ML pipelines diagnosis.
+However, coarse-grained lineage lacks the details at cell level for ML pipelines diagnosis.
 
 {\bf Fine-grained Lineage:} Fine-grained lineage has been investigated in the context of data visualization~\cite{stonebraker93, woodruff97},  
 data warehouse~\cite{cui00, cui03}, RDBMS~\cite{widom04}, and user-curated database~\cite{buneman06}.
@@ -1271,7 +1271,7 @@ model and predictions.
 
 \section{Conclusion and Future Work}
 \label{sec:Conclusion}
-SystemX enables interactive ML pipeline diagnostics by leveraging the fine-grained data lineage.
+SystemX enables interactive ML pipeline diagnostics by leveraging fine-grained data lineage.
 SystemX exposes an elegant and powerful interface for users to specify and instrument lineage capuring.
 This interface has a coverage of 87\% of the transformers in the current KeystoneML code base. 
 Combining the metadata of data structures, the high-order function approach and spatial indexing
@@ -1280,7 +1280,7 @@ Practically, SystemX introduces a wall clock time overhead of 16\%-54\% dependin
 and use case.
 
 As future work, we are investigating the diagnosability inside the training process of the estimator. 
-We seek to provide users with the fine-grained lineage for an estimator to answer queries such as
+We seek to provide users with fine-grained lineage for an estimator to answer queries such as
 finding supporting training samples for a prediction and the impact of certain feature removal or training data item removal. 
 We are also working on the optimization of large scale query on a single data structure.
 
