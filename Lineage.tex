@@ -124,7 +124,7 @@ SystemML~\cite{ghoting11systemml}, and KeystoneML~\cite{sparks15} focus on a dis
 
 In practice, to obtain a working model, users often need to try a number of options (e.g., featurization, training parameters, and datasets). 
 When experimenting with these options, users frequently analyze results together with the corresponding input data,  
-locate code segment responsible for unexpected outcomes, or rerun the computation with the removal of suspicious data anomalies.
+locate code segments responsible for unexpected outcomes, or rerun the computation with the removal of suspicious data anomalies.
 Commonly they use a case-by-case solution to record necessary information and store such information in persistent storage for examination.
 These solutions are often use case specific, prone to performance degradation, and they can complicate code
 management due to the demand for multiple versions of a pipeline.
@@ -482,7 +482,7 @@ training data items (e.g., the images that have both dogs and cats) due to measu
 A natural investigation is then to remove these images, and test if that improves prediction accuracy.
 
 With SystemX, the user can intercept the pipeline by loading the output of RowNormalizer (the last transformer before training process) 
-directly into KeystoneML, filter out the data items that are derived from the images with both dogs and cats , 
+directly into KeystoneML, filter out the data items that are derived from the images with both dogs and cats, 
 and apply the filtered dataset directly to the linear solver.
 In this way, the rerunning process can bypass the expensive data preparation procedure (from PixelScaler to RowNormalizer) 
 resulting in shorter turnaround time.
